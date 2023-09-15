@@ -70,7 +70,7 @@ def getTeloBoundary(seq, isGStrand, composition = [], teloWindow = 100, windowSt
     # print("graphAreaWindowSize: " + str(graphAreaWindowSize))
 
     if len(composition) == 0:
-        print("Warning: no composition list provided, using default telomere compositions")
+        # print("Warning: no composition list provided, using default telomere compositions")
         if isGStrand == True:
             composition = expectedTeloCompositionQ
         else:
@@ -190,3 +190,22 @@ def getTeloBoundary(seq, isGStrand, composition = [], teloWindow = 100, windowSt
     # print("q returning ", boundaryPoint)
     return boundaryPoint
         
+
+
+# The following function takes in the location of a reference genome, and outputs
+# a genome file with the telomeres removed. The teloBP parameters have been set 
+# to the recommended values mentioned in the Readme, but can be modified.
+# NOTE: This algorithm assumes that each chromosome is its own read, and not split into 
+# q and p arms. 
+
+def trimTeloReferenceGenome(filename, outputFilename, compositionIn = [], teloWindowIn = 100, windowStepIn = 6, maxAreaThresholdIn = -15, minAreaThresholdIn = -5, targetPatternIndexIn=-1, nucleotideGraphAreaWindowSizeIn = 500, showGraphsIn = False, returnLastDiscontinuityIn = False):
+    trimmed_sequences = []
+      
+    # Trims the records and saves them
+    for record in SeqIO.parse(filename, "fastq"):
+        startTeloLength = getTeloBoundary(record.seq[:500000], isGStrand = False, composition = compositionIn, teloWindow = teloWindowIn, windowStep = windowStepIn, maxAreaThresholdIn=maxAreaThresholdIn, minAreaThreshold = minAreaThresholdIn, targetPatternIndex = targetPatternIndexIn, nucleotideGraphAreaWindowSize = nucleotideGraphAreaWindowSizeIn, showGraphs = showGraphsIn, returnLastDiscontinuity = returnLastDiscontinuityIn)
+        endTeloLength = getTeloBoundary(record.seq[-500000:], isGStrand = True, composition = compositionIn, teloWindow = teloWindowIn, windowStep = windowStepIn, maxAreaThresholdIn=maxAreaThresholdIn, minAreaThreshold = minAreaThresholdIn, targetPatternIndex = targetPatternIndexIn, nucleotideGraphAreaWindowSize = nucleotideGraphAreaWindowSizeIn, showGraphs = showGraphsIn, returnLastDiscontinuity = returnLastDiscontinuityIn)
+        trimmed_sequences.append(record[startTeloLength:-endTeloLength])
+
+    # Write the trimmed sequences to the output file
+    SeqIO.write(trimmed_sequences, outputFilename, "fastq")
