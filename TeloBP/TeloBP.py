@@ -1,21 +1,10 @@
 from teloBoundaryHelpers import *
 from constants import expectedTeloCompositionQ, expectedTeloCompositionP, areaDiffsThreshold
 import numpy as np
-import pandas as pd
 from Bio import SeqIO
-from Bio.Seq import Seq
-# import matplotlib.pyplot as plt
 
 
-# This value must be large enough that it can "look into" the area well past the telomere boundary, allowing it to
-# make sure that the discontinuity in the telomere pattern is sustained, and that the first change in the pattern
-# can be identified. If it is too small, then the first change in the area graph may not be idenfied, as the
-# offset values will be too noisy.
-# nucleotideGraphAreaWindowSize = 500
-# nucleotideGraphAreaWindowSize = 10
-
-
-# I don't know how I can properly explain the areaThreshold values, without just showing you the graphs
+# The following function takes in a sequence, and returns the index of the telomere boundary.
 def getTeloBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False):
     """
     This function takes in a sequence, and returns the index of the telomere boundary.
@@ -112,20 +101,19 @@ def getTeloBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6
 
     if returnLastDiscontinuity:
         # Here, we grab the last point where the area is below the changeThreshold, and the slope is negative
-        # *** 0<(areaList[y]-areaList[y+1] is a weird way of checking if the slope is negative, but it works. might change later
         indexAtThreshold = (next((y for y in range(len(areaList) - 2, 0, -1) if (
-            areaList[y] > changeThreshold and (0 < (areaList[y] - areaList[y + 1])))), indexAtThreshold))
+            areaList[y] > changeThreshold and (0 > (areaList[y + 1] - areaList[y])))), indexAtThreshold))
         if indexAtThreshold != -1:
             # The min threshold was reached, and the slope was negative, so we can look for the max threshold ahead of it
             indexAtThreshold = (next((y for y in range(indexAtThreshold, len(areaList) - 2) if (
-                areaList[y] < plateauDetectionThreshold and (0 < (areaList[y] - areaList[y + 1])))), indexAtThreshold))
+                areaList[y] < plateauDetectionThreshold and (0 > (areaList[y + 1] - areaList[y])))), indexAtThreshold))
         else:
             # Didn't find a point above the changeThreshold, so we just scan for the first point past the maxThreshold
             indexAtThreshold = (next((y for y in range(len(areaList) - 2) if (
-                areaList[y] < plateauDetectionThreshold and (0 < (areaList[y] - areaList[y + 1])))), indexAtThreshold))
+                areaList[y] < plateauDetectionThreshold and (0 > (areaList[y + 1] - areaList[y])))), indexAtThreshold))
     else:
         indexAtThreshold = (next((y for y in range(len(areaList) - 2) if (
-            areaList[y] < plateauDetectionThreshold and (0 < (areaList[y] - areaList[y + 1])))), indexAtThreshold))
+            areaList[y] < plateauDetectionThreshold and (0 > (areaList[y + 1] - areaList[y])))), indexAtThreshold))
 
     if indexAtThreshold == -1:
         print("No telo boundary found, returning -1")

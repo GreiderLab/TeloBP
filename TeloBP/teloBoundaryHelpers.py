@@ -50,12 +50,6 @@ def getGraphArea(offsets, targetColumn, windowSize):
 
 
 def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1):
-    # smoothing_window = 12
-    # smoothed_data = np.zeros_like(rowIn)
-    # smoothed_data = np.convolve(rowIn, np.ones(smoothing_window), mode='same') / smoothing_window
-
-    # derivatives = np.gradient(smoothed_data, axis=0)
-    # row=derivatives
     row = rowIn
     x = np.arange(len(row))
     x = x * windowStep
@@ -79,12 +73,7 @@ def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1):
 
 
 def makeOffsetPlot(offsets, compositions, offsetIndexToBPConstant):
-    # Make a plot with 4 lines
-    # x axis is the index of the offset
-    # y axis is the offset value
-    # 4 lines for T, A, G, C
 
-    # Example multidimensional array
     data = np.array(offsets)
     transposed_data = data.T
 
@@ -127,7 +116,7 @@ def testTeloLength(chr, length, testDict=manualLabelsCHM13):
         print("Error: chromosome not found in dictionary, returning 0")
         return 0
     expectedLength = testDict[chr]
-    # print(chr + " offset: " + str(length - expectedLength)+"bp (obs - exp)")
+    # print(chr + " offset: " + str(length - expectedLength) + "bp (obs - exp)")
     return (length - expectedLength)
 
 
