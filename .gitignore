@@ -1,0 +1,7 @@
+
+*.fna
+*.fai
+Data/
+outputs/trimmedGenome/
+.venv/
+.vscode/
