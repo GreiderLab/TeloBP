@@ -42,22 +42,19 @@ python trimGenome.py <genome_file> <output_file>
 Demo code for using TeloBP is provided in the demo.ipynb notebook file. The TeloBP function takes the following arguments:
 
 ```
-TeloBP(seq, isGStrand, composition=[], teloWindow=100, windowStep=6, plateauDetectionThreshold=-60, changeThreshold=-20, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False)
+getTeloBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6, plateauDetectionThreshold=-60, changeThreshold=-20, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False)
 ```
 
 And returns the distance between the telomere boundary and the end of the sequence, or in other words, the length of the telomere.
 
 In most cases, the only arguments that need to be changed are the following:
 
-```
 **seq**: The sequence to be analyzed
 **isGStrand**: Whether the sequence is the G-strand or not
-**composition**: The expected nucleotide composition of the telomere. This is used to calculate the expected telomere pattern. default: ["GGG", 3/6].  This means that the expected telomere pattern is "GGG" and that the expected telomere pattern should be found in 3/6 of the telomere window.
-Depending on the quality of the sequence, this may need to be changed. For example, nanopore reads with many misscalls may need a composition
+**composition**: The expected nucleotide composition of the telomere. This is used to calculate the expected telomere pattern. default: ["GGG", 3/6]. This means that the expected telomere pattern is "GGG" and should be found in 3/6 of the telomere.
+Depending on the quality of the sequence, this may need to be changed. For example, nanopore reads with many misscalls may need a composition of ["GGG|AAA", 3/6, 3] to account for the misscalls.
 
-Regular expressions can also be used in the composition, but require a third argument specifying the length of the pattern being searched for. For example, ["GGG|TTT", 3/6, 3] would search for either "GGG" or "TTT", and expects to see them in 3/6 nucleotides in the telomere. The third argument specifies that the pattern being searched for is 3 nucleotides long.
-
-```
+When using regular expressions for the patterns, a third argument is required, specifying the length of the pattern being searched for. For example, ["GGG|AAA", 3/6, 3] would search for either "GGG" or "TTT", and expects to see them in 3/6 nucleotides in the telomere. The third argument specifies that the pattern being searched for is 3 nucleotides long.
 
 **NOTE**: If using TeloBP for nanopore reads, use these parameters:
 
@@ -76,7 +73,6 @@ TeloBP works by scanning through the sequence and finding the point at which the
 Now we need to mark the point at which the offset score changes. To make sure that the change is not a random spike, we take the area under the curve of our offset scores, using the nucleotideGraphAreaWindowSize value as the window size. This produces a graph that looks like this:
 
 ![CHM13_chr1q_area_under_nucleotide_offset_graph](https://github.com/CWGreider/GreiderLab/assets/78556850/ffc42c8c-4c03-4e18-b5ae-5075ec4e8f17)
-
 
 Here, we can expect to see the graph spike around the telomere boundary point. We scan ahead till we get an area value below the plateauDetectionThreshold, then start measuring the difference between area values till the slope plateaus. This is the point at which the telomeric pattern breaks, and is the telomere boundary point.
 
