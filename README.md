@@ -29,12 +29,13 @@ pip install -r requirements.txt
 
 ### Genome Trimming
 
-**NOTE**: This algorithm assumes that each chromosome is its own read, and not split into q and p arms.
 The scripts folder contains the script "trimGenome.py" which has parameters preset for removing the telomeres on a genome. The script can be run with the following command:
 
 ```
 python trimGenome.py <genome_file> <output_file>
 ```
+
+**NOTE**: This algorithm assumes that each chromosome is its own read, and not split into q and p arms.
 
 ### TeloBP Function Arguments
 
@@ -70,7 +71,12 @@ returnLastDiscontinuity = True
 
 TeloBP works by scanning through the sequence and finding the point at which the telomeric pattern breaks, marking the telomere boundary point. It does this by scanning through the sequence in a window of size teloWindow, and calculates how similar the sequence is to the expected telomere composition. This similarity is calculated by counting the number of times the expected telomeric pattern appears in the window, and dividing it by the number of nucleotides in the window. The window is then moved along the sequence by the windowStep value, and the similarity is calculated again. This is repeated until the end of the sequence is reached. Graphing the offset scores produces a graph that looks like this:
 
+![CHM13_chr1q_Nucleotides_Offset_Graph](https://github.com/CWGreider/GreiderLab/assets/78556850/82859bbd-158a-4534-ac4a-85fa7caeeec2)
+
 Now we need to mark the point at which the offset score changes. To make sure that the change is not a random spike, we take the area under the curve of our offset scores, using the nucleotideGraphAreaWindowSize value as the window size. This produces a graph that looks like this:
+
+![CHM13_chr1q_area_under_nucleotide_offset_graph](https://github.com/CWGreider/GreiderLab/assets/78556850/ffc42c8c-4c03-4e18-b5ae-5075ec4e8f17)
+
 
 Here, we can expect to see the graph spike around the telomere boundary point. We scan ahead till we get an area value below the plateauDetectionThreshold, then start measuring the difference between area values till the slope plateaus. This is the point at which the telomeric pattern breaks, and is the telomere boundary point.
 
