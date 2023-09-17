@@ -50,7 +50,9 @@ And returns the distance between the telomere boundary and the end of the sequen
 In most cases, the only arguments that need to be changed are the following:
 
 **seq**: The sequence to be analyzed
+
 **isGStrand**: Whether the sequence is the G-strand or not
+
 **composition**: The expected nucleotide composition of the telomere. This is used to calculate the expected telomere pattern. default: ["GGG", 3/6]. This means that the expected telomere pattern is "GGG" and should be found in 3/6 of the telomere.
 Depending on the quality of the sequence, this may need to be changed. For example, nanopore reads with many misscalls may need a composition of ["GGG|AAA", 3/6, 3] to account for the misscalls.
 
