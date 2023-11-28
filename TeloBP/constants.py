@@ -10,15 +10,6 @@
 #     ["GGG", 3/6],
 #     ["TT", 2/6],
 #     ["GGG|AAA", 3/6, 3],
-
-expectedTeloCompositionQ = [
-    ["GGG", 3/6],
-]
-
-expectedTeloCompositionP = [
-    ["CCC", expectedTeloCompositionQ[0][1]],
-]
-
 # expectedTeloCompositionQ = [
 #     ["T", 2/6],
 #     ["A", 1/6],
@@ -39,6 +30,14 @@ expectedTeloCompositionP = [
 #     ["CCCTAA|CTTCTT|CCCTGG|CCTGG", 6/6, 6],
 #     ["CCC|TTT", expectedTeloCompositionQ[6][1], 3]
 # ]
+
+expectedTeloCompositionQ = [
+    ["GGG", 3/6],
+]
+
+expectedTeloCompositionP = [
+    ["CCC", expectedTeloCompositionQ[0][1]],
+]
 
 # When the area under the curve of the offsets is calculated, this
 # constant is used to mark the point where the slope of the curve

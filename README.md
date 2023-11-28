@@ -58,13 +58,19 @@ Depending on the quality of the sequence, this may need to be changed. For examp
 
 When using regular expressions for the patterns, a third argument is required, specifying the length of the pattern being searched for. For example, ["GGG|AAA", 3/6, 3] would search for either "GGG" or "TTT", and expects to see them in 3/6 nucleotides in the telomere. The third argument specifies that the pattern being searched for is 3 nucleotides long.
 
-**NOTE**: If using TeloBP for nanopore reads, use these parameters:
+### TeloNP: TeloBP for Nanopore Reads
+
+TeloNP uses the same TeloBP algorithm, but is pre-optimized for nanopore reads.
+
+The current parameters are optimized to account for misscalls in Guppy basecalling.
+
+#### TeloNP recommended usage
 
 ```
-composition=[["GGG|AAA", 3/6, 3]] # for the GStrand, and
-composition=[["CCCTAA|CTTCTT|CCCTGG|CCTGG", 6/6, 6]] # for the CStrand
-returnLastDiscontinuity = True
+getTeloNPBoundary(seq, isGStrand)
 ```
+
+Where seq is the sequence to be analyzed, and isGStrand is a boolean value specifying whether the sequence is the G-strand or not.
 
 ## TeloBP Algorithm Description
 
