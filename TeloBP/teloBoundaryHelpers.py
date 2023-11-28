@@ -135,7 +135,7 @@ def validate_parameters(seq, isGStrand, composition, teloWindow=100, windowStep=
         raise ValueError(
             "Error: sequence length must be greater than teloWindow")
 
-    if not isinstance(isGStrand, bool):
+    if not isinstance(isGStrand, bool) and not isinstance(isGStrand, np.bool_):
         raise ValueError("isGStrand should be a boolean")
 
     if not isinstance(windowStep, int) or windowStep < 1:
