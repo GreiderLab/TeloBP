@@ -90,11 +90,14 @@ def makeOffsetPlot(offsets, compositions, offsetIndexToBPConstant):
 
     # Plot each line
     for i in range(len(labelDict)):
+        # This line reverses the order of the data. Used for figure in the paper
+        # ax.plot(x, transposed_data[i, ::-1], label=f"{labelDict[i]} Offset")
+
         ax.plot(x, transposed_data[i, :], label=f"{labelDict[i]} Offset")
 
     # Set labels and title
-    ax.set_xlabel('Distance from end of sequence')
-    ax.set_ylabel('Nucleotide offset')
+    ax.set_xlabel('Distance from end of sequence (bp)')
+    ax.set_ylabel('Nucleotide offset (%)')
     ax.set_title('Nucleotide Offsets from Expected Telomere Composition')
     ax.legend()
     plt.show()
@@ -127,16 +130,11 @@ def write_bed_file(file_path, bed_data):
 
 
 def validate_parameters(seq, isGStrand, composition, teloWindow=100, windowStep=6, plateauDetectionThreshold=-15, changeThreshold=-5, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False):
-    if not isinstance(teloWindow, int) or teloWindow < 6:
-        raise ValueError(
-            "teloWindow should be an int greater than or equal to 6")
-
-    if len(seq) < teloWindow:
-        raise ValueError(
-            "Error: sequence length must be greater than teloWindow")
-
+    
+    validate_seq_teloWindow(seq, teloWindow)
+    
     if not isinstance(isGStrand, bool) and not isinstance(isGStrand, np.bool_):
-        raise ValueError("isGStrand should be a boolean")
+        raise ValueError("isGStrand should be a boolean, or numpy boolean")
 
     if not isinstance(windowStep, int) or windowStep < 1:
         raise ValueError(
@@ -152,3 +150,12 @@ def validate_parameters(seq, isGStrand, composition, teloWindow=100, windowStep=
 
     if not isinstance(showGraphs, bool):
         raise ValueError("showGraphs should be a boolean")
+
+def validate_seq_teloWindow(seq, teloWindow):
+    if not isinstance(teloWindow, int) or teloWindow < 6:
+        raise ValueError(
+            "teloWindow should be an int greater than or equal to 6")
+
+    if len(seq) < teloWindow:
+        raise ValueError(
+            "Error: sequence length must be greater than teloWindow")
