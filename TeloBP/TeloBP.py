@@ -1,12 +1,12 @@
 from teloBoundaryHelpers import *
-from constants import expectedTeloCompositionQ, expectedTeloCompositionP, areaDiffsThreshold
+from constants import expectedTeloCompositionQ, expectedTeloCompositionP, areaDiffsThreshold, teloNPTeloCompositionGStrand, teloNPTeloCompositionCStrand
 import numpy as np
 from Bio import SeqIO
 import re
 
 
 # The following function takes in a sequence, and returns the index of the telomere boundary.
-def getTeloBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False, secondarySearch = False):
+def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCStrand = [], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False, secondarySearch = False):
     """
     This function takes in a sequence, and returns the index of the telomere boundary.
 
@@ -35,13 +35,26 @@ def getTeloBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6
     boundaryPoint = -1
     ntOffsets = []
     graphAreaWindowSize = int(nucleotideGraphAreaWindowSize / windowStep)
+    validate_seq_teloWindow(seq, teloWindow)
 
-    if len(composition) == 0:
-        # print("Warning: no composition list provided, using default telomere compositions")
-        if isGStrand == True:
-            composition = expectedTeloCompositionQ
-        else:
-            composition = expectedTeloCompositionP
+    if len(compositionGStrand) == 0:
+        compositionGStrand = expectedTeloCompositionQ
+    if len(compositionCStrand) == 0:
+        compositionCStrand = expectedTeloCompositionP
+
+    # calculate telomere strand type
+    if isGStrand == None:
+        isGStrand = getIsGStrandFromSeq(seq, compositionGStrand[targetPatternIndex], compositionCStrand[targetPatternIndex])
+        if isGStrand == -1:
+            print("Could not determine telomere strand type, returning -1")
+            return -1
+        
+    composition = []
+    if isGStrand:
+        composition = compositionGStrand
+    else:
+        composition = compositionCStrand
+
 
     validate_parameters(seq, isGStrand, composition, teloWindow, windowStep, plateauDetectionThreshold,
                         changeThreshold, targetPatternIndex, nucleotideGraphAreaWindowSize, showGraphs)
@@ -201,15 +214,18 @@ def getTeloBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6
                 # print(f"tempBoundary: {tempBoundary}")
                 scanSeq = seq[tempBoundary-telomereOffsetRE:tempBoundary+subTelomereOffsetRE]
                 
-                revPtrn = ntPattern[::-1]
-                rev_pattern = "("+revPtrn+")" + "("+revPtrn+")"
-                match = re.search(str(rev_pattern), str(scanSeq[::-1]))
-                if match:
-                    secBoundary = len(scanSeq) - match.span()[0]
-                    boundaryPoint = tempBoundary + secBoundary - telomereOffsetRE
+                if patternComposition != 1:
+                    print("Warning: Secondary search is not fully compatible with telomere compositions less than 1. Please provide a telomere pattern that covers 6/6 of the expected telomere nucleotides, like 'TTAGGG' or 'GGG...'.")
                 else:
-                    boundaryPoint = tempBoundary
-                    print("Secondary search failed to find a match, returning original boundary point")
+                    revPtrn = ntPattern[::-1]
+                    rev_pattern = "("+revPtrn+")" + "("+revPtrn+")"
+                    match = re.search(str(rev_pattern), str(scanSeq[::-1]))
+                    if match:
+                        secBoundary = len(scanSeq) - match.span()[0]
+                        boundaryPoint = tempBoundary + secBoundary - telomereOffsetRE
+                    else:
+                        boundaryPoint = tempBoundary
+                        print("Secondary search failed to find a match, returning original boundary point")
 
     if showGraphs:
         graphLine(areaList, composition[targetPatternIndex]
@@ -240,6 +256,36 @@ def trimTeloReferenceGenome(filename, outputFilename, compositionIn=[], teloWind
     SeqIO.write(trimmed_sequences, outputFilename, "fasta")
 
 
+def getIsGStrandFromSeq(seq, GStrandPatternIn, CStrandPatternIn, searchStrandRepeats = 4, repeatCountMax = 1, fusedReadTeloRepeatThreshold = 20):
+    # We will look at the beginning of the seq and count for C strands, then look at the end and count for G strands
+    # the compare the counts to see which is greater and return the result
+    
+    CStrandPattern = CStrandPatternIn[0]
+    GStrandPattern = GStrandPatternIn[0]
+
+    CStrandPattern =  ("("+CStrandPattern+")") * searchStrandRepeats
+    GStrandPattern =  ("("+GStrandPattern+")") * searchStrandRepeats
+
+    cStrandCount = len(re.findall(CStrandPattern, str(seq.upper())))
+    gStrandCount = len(re.findall(GStrandPattern, str(seq.upper())))
+
+    if min(cStrandCount, gStrandCount) > 100 or abs(cStrandCount - gStrandCount) <= 0.6 * min(cStrandCount, gStrandCount) or abs(cStrandCount - gStrandCount) <= repeatCountMax or min(cStrandCount, gStrandCount) >= fusedReadTeloRepeatThreshold:
+        print("Warning: fused strand likely, returning -10")
+        return -10
+
+    if max(cStrandCount, gStrandCount) <= repeatCountMax:
+        print("Warning: could not determine telomere strand type from sequence, returning -20")
+        # print(seq)
+        # print(f"C strand count: {cStrandCount}")
+        # print(f"G strand count: {gStrandCount}")
+        return -20
+
+    if cStrandCount > gStrandCount:
+        return False
+    else:
+        return True
+
+
 def isGStrand(chrArm,strand):
     if strand == "+" and chrArm == "q":
         return True
@@ -255,17 +301,5 @@ def isGStrand(chrArm,strand):
     
 
 
-def getTeloNPBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=750, showGraphs=False, graphDataOutputFilePath=None, chrName="", returnLastDiscontinuity=True, secondarySearch = True):
-    if composition == [] and isGStrand:
-        composition=[["[^GGG]GGG|[^AAA]AAA|TTAGG.", 6/6, 6]] # for the GStrand, and
-        # composition=[["T", 2/6], ["A", 1/6],["G", 3/6],["C", 0/6],["[^GGG]GGG|[^AAA]AAA|TTAGG.", 6/6, 6]] # for the GStrand, and
-        # composition=[["GGG", 3/6], ["AAA", 3/6],["TTAGG.", 6/6, 6],["[^GGG]GGG|[^AAA]AAA|TTAGG.", 6/6, 6]] # for the GStrand, and
-    elif composition == [] and not isGStrand:
-        composition=[["CTTCTT|CCTGG|CCC...", 6/6, 6]] # for the CStrand
-        # composition=[["A", 2/6], ["T", 1/6], ["C", 3/6], ["G", 0/6], ["CTTCTT|CCTGG|CCC...", 6/6, 6]] # for the CStrand
-        # composition=[["CTTCTT", 6/6], ["CCTGG", 5/6], ["CCC...", 6/6, 6], ["CTTCTT|CCTGG|CCC...", 6/6, 6]] # for the CStrand
-    
-    if isGStrand:
-        return getTeloBoundary(seq, isGStrand, composition=composition, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, graphDataOutputFilePath=graphDataOutputFilePath, chrName=chrName, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch)
-    else:
-        return getTeloBoundary(seq, isGStrand, composition=composition, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, graphDataOutputFilePath=graphDataOutputFilePath, chrName=chrName, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch)
+def getTeloNPBoundary(seq, isGStrand=None, compositionCStrandIn=teloNPTeloCompositionCStrand, compositionGStrandIn=teloNPTeloCompositionGStrand, teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=750, showGraphs=False, graphDataOutputFilePath=None, chrName="", returnLastDiscontinuity=True, secondarySearch = True):
+    return getTeloBoundary(seq, isGStrand, compositionCStrand=compositionCStrandIn, compositionGStrand=compositionGStrandIn, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, graphDataOutputFilePath=graphDataOutputFilePath, chrName=chrName, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch)

@@ -39,6 +39,12 @@ expectedTeloCompositionP = [
     ["CCC", expectedTeloCompositionQ[0][1]],
 ]
 
+# Recommended composition for nanopore reads called with Guppy
+teloNPTeloCompositionGStrand = [["(?!GGG)[AT]{3}GGG|(?!AAA)[AT]{3}AAA|TTAGG.", 6/6, 6]]
+
+teloNPTeloCompositionCStrand = [["CTTCTT|CCTGG|CCC(?!CCC)[ATCG]{3}", 6/6, 6]]
+
+
 # When the area under the curve of the offsets is calculated, this
 # constant is used to mark the point where the slope of the curve
 # starts to plateau. Basically, once the difference between two
