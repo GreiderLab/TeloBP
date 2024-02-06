@@ -40,7 +40,7 @@ expectedTeloCompositionP = [
 ]
 
 # Recommended composition for nanopore reads called with Guppy
-teloNPTeloCompositionGStrand = [["(?!GGG)[AT]{3}GGG|(?!AAA)[AT]{3}AAA|TTAGG.", 6/6, 6]]
+teloNPTeloCompositionGStrand = [["(?!GGG)[ATC]{2}.GGG|(?!AAA)[AT]{3}AAA|TTAGG.", 6/6, 6]]
 
 teloNPTeloCompositionCStrand = [["CTTCTT|CCTGG|CCC(?!CCC)[ATCG]{3}", 6/6, 6]]
 
