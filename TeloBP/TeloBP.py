@@ -12,8 +12,9 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
 
     :param seq: The sequence to be analyzed
     :param isGStrand: True if the sequence is the G strand (has TTAGGG telomeres), False if it is the C strand (has CCCTAA telomeres). 
-    :param composition: A list of lists, where each list contains a nucleotide pattern, and the expected composition of that pattern 
-           in the telomere.
+           Is None by default, and will be determined using the composition lists (count of G vs C repeats) if not specified.
+    :param compositionGStrand: A list of lists, where each list contains a nucleotide pattern representing the expected telomere pattern on the G Strand.
+    :param compositionCStrand: A list of lists, where each list contains a nucleotide pattern representing the expected telomere pattern on the C Strand.
     :param teloWindow: The size of the window to be used when calculating the offset of the nucleotide composition from the expected 
            telomere composition.
     :param windowStep: The step size to be used when moving through the sequence in 'windows' of size teloWindow.
@@ -254,30 +255,60 @@ def trimTeloReferenceGenome(filename, outputFilename, compositionIn=[], teloWind
     # Write the trimmed sequences to the output file
     SeqIO.write(trimmed_sequences, outputFilename, "fasta")
 
-
-def getIsGStrandFromSeq(seq, GStrandPatternIn, CStrandPatternIn, searchStrandRepeats = 4, repeatCountMax = 1, fusedReadTeloRepeatThreshold = 20):
+def getIsGStrandFromSeq(seq, GStrandPatternIn, CStrandPatternIn, searchStrandRepeats = 4, minTeloCountDiff = 1, fusedReadTeloRepeatThreshold = 20, maxTelomereGap = 150):
     # We will look at the beginning of the seq and count for C strands, then look at the end and count for G strands
     # the compare the counts to see which is greater and return the result
     
     CStrandPattern = CStrandPatternIn[0]
     GStrandPattern = GStrandPatternIn[0]
 
-    CStrandPattern =  ("("+CStrandPattern+")") * searchStrandRepeats
-    GStrandPattern =  ("("+GStrandPattern+")") * searchStrandRepeats
+    boundaryReg = ".{0,6}"
 
-    cStrandCount = len(re.findall(CStrandPattern, str(seq.upper())))
-    gStrandCount = len(re.findall(GStrandPattern, str(seq.upper())))
+    CStrandPattern =  ("("+CStrandPattern+")"+boundaryReg) * searchStrandRepeats
+    GStrandPattern =  ("("+GStrandPattern+")"+boundaryReg) * searchStrandRepeats
+    CStrandPattern = CStrandPattern[:-len(boundaryReg)]
+    GStrandPattern = GStrandPattern[:-len(boundaryReg)]
 
-    if min(cStrandCount, gStrandCount) > 100 or abs(cStrandCount - gStrandCount) <= 0.6 * min(cStrandCount, gStrandCount) or abs(cStrandCount - gStrandCount) <= repeatCountMax or min(cStrandCount, gStrandCount) >= fusedReadTeloRepeatThreshold:
+    allCStrands = [match for match in re.finditer(CStrandPattern, str(seq.upper()))]
+    # get start index of each match. For C strand start at the beginning and count forward
+    cStrandCount = 0
+    cStrandMatchLengths = 0
+    lastMatch = 0
+    for match in allCStrands:
+        if lastMatch == 0:
+            lastMatch = match.start()
+
+        if match.start() - lastMatch <= maxTelomereGap:
+            cStrandCount += 1
+            cStrandMatchLengths += match.end() - match.start()
+        lastMatch = match.start()
+        
+    allGStrands = [match for match in re.finditer(GStrandPattern, str(seq.upper()))]
+
+    gStrandCount = 0
+    gStrandMatchLengths = 0
+    lastMatch = 0
+    for match in allGStrands[::-1]:
+        if lastMatch == 0:
+            lastMatch = match.start()
+        if lastMatch - match.start() <= maxTelomereGap:
+            gStrandCount += 1
+            gStrandMatchLengths += match.end() - match.start()
+        lastMatch = match.start()
+
+    if max(cStrandCount, gStrandCount) <= minTeloCountDiff and abs(cStrandCount - gStrandCount) <= minTeloCountDiff:
+
+        # The intention here is to give a last chance to classify the read, as we want to keep as many short reads as possible
+        if cStrandMatchLengths > gStrandMatchLengths:
+            return False
+        elif gStrandMatchLengths > cStrandMatchLengths:
+            return True
+        print("Warning: could not determine telomere strand type from sequence, returning -20")
+        return -20
+    
+    if min(cStrandCount, gStrandCount) > 100 or abs(cStrandCount - gStrandCount) <= 0.6 * min(cStrandCount, gStrandCount) or min(cStrandCount, gStrandCount) >= fusedReadTeloRepeatThreshold:
         print("Warning: fused strand likely, returning -10")
         return -10
-
-    if max(cStrandCount, gStrandCount) <= repeatCountMax:
-        print("Warning: could not determine telomere strand type from sequence, returning -20")
-        # print(seq)
-        # print(f"C strand count: {cStrandCount}")
-        # print(f"G strand count: {gStrandCount}")
-        return -20
 
     if cStrandCount > gStrandCount:
         return False

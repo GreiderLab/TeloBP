@@ -42,35 +42,37 @@ python trimGenome.py <genome_file> <output_file>
 Demo code for using TeloBP is provided in the demo.ipynb notebook file. The TeloBP function takes the following arguments:
 
 ```
-getTeloBoundary(seq, isGStrand, composition=[], teloWindow=100, windowStep=6, plateauDetectionThreshold=-60, changeThreshold=-20, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False)
+getTeloBoundary(seq, isGStrand = None,  compositionGStrand=[], compositionCStrand = [], teloWindow=100, windowStep=6, plateauDetectionThreshold=-60, changeThreshold=-20, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False)
 ```
 
 And returns the distance between the telomere boundary and the end of the sequence, or in other words, the length of the telomere.
 
-In most cases, the only arguments that need to be changed are the following:
+While TeloBP's default parameters can be used to calculate a telomere boundary using just a sequence, depending on the application, finetuning the following parameters may be needed to improve accuracy. In most cases, the only arguments that need to be changed are the following:
 
 **seq**: The sequence to be analyzed
 
-**isGStrand**: Whether the sequence is the G-strand or not
+**isGStrand**: Whether the sequence is the G-strand or not. Is None by default, and will be determined using the composition lists (count of G vs C repeats) if not specified.
 
-**composition**: The expected nucleotide composition of the telomere. This is used to calculate the expected telomere pattern. default: ["GGG", 3/6]. This means that the expected telomere pattern is "GGG" and should be found in 3/6 of the telomere.
+**compositionGStrand and compositionCStrand**: The expected nucleotide composition of the telomere. This is used to calculate the expected telomere pattern. default for GStrand is ["GGG", 3/6], and ["CCC", 3/6] for CStrand. This means that the expected telomere pattern is "GGG" and should be found in 3/6 of the telomere.
 Depending on the quality of the sequence, this may need to be changed. For example, nanopore reads with many misscalls may need a composition of ["GGG|AAA", 3/6, 3] to account for the misscalls.
 
-When using regular expressions for the patterns, a third argument is required, specifying the length of the pattern being searched for. For example, ["GGG|AAA", 3/6, 3] would search for either "GGG" or "TTT", and expects to see them in 3/6 nucleotides in the telomere. The third argument specifies that the pattern being searched for is 3 nucleotides long.
+When using regular expressions for the patterns, a third argument is required, specifying the length of the pattern being searched for. For example, ["GGG|AAA", 3/6, 3] would search for either "GGG" or "AAA", and expects to see them in 3/6 nucleotides in the telomere. The third argument specifies that the pattern being searched for is 3 nucleotides long. Another example would be ["TTAGGG|TTTGGG", 6/6, 6].
 
 ### TeloNP: TeloBP for Nanopore Reads
 
-TeloNP uses the same TeloBP algorithm, but is pre-optimized for nanopore reads.
+TeloNP uses the same TeloBP algorithm, but is pre-optimized for nanopore reads basecalled with guppy.
 
 The current parameters are optimized to account for misscalls in Guppy basecalling.
 
 #### TeloNP recommended usage
 
 ```
-getTeloNPBoundary(seq, isGStrand)
+getTeloNPBoundary(seq)
 ```
 
-Where seq is the sequence to be analyzed, and isGStrand is a boolean value specifying whether the sequence is the G-strand or not.
+Where seq is the sequence to be analyzed.
+
+Optionally, you can specify the isGStrand parameter, which is a boolean value specifying whether the sequence is the G-strand or not. This may be preferable if the sequence strand is known through some previous analysis like an alignment, as it will save time by not having to calculate the composition of the sequence.
 
 ## TeloBP Algorithm Description
 
