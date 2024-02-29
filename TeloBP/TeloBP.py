@@ -12,8 +12,9 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
 
     :param seq: The sequence to be analyzed
     :param isGStrand: True if the sequence is the G strand (has TTAGGG telomeres), False if it is the C strand (has CCCTAA telomeres). 
-    :param composition: A list of lists, where each list contains a nucleotide pattern, and the expected composition of that pattern 
-           in the telomere.
+           Is None by default, and will be determined using the composition lists (count of G vs C repeats) if not specified.
+    :param compositionGStrand: A list of lists, where each list contains a nucleotide pattern representing the expected telomere pattern on the G Strand.
+    :param compositionCStrand: A list of lists, where each list contains a nucleotide pattern representing the expected telomere pattern on the C Strand.
     :param teloWindow: The size of the window to be used when calculating the offset of the nucleotide composition from the expected 
            telomere composition.
     :param windowStep: The step size to be used when moving through the sequence in 'windows' of size teloWindow.
