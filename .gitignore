@@ -1,6 +1,10 @@
 
 *.fna
 *.fai
+*.fasta
+*.fai
+*.zip
+*.pyc
 Data/
 outputs/trimmedGenome/
 .venv/
