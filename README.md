@@ -2,6 +2,8 @@
 
 TeloBP is an algorithm for identifying the telomere boundary in a genomic sequence. It scans through DNA sequence and finds the point at which the telomeric pattern breaks, making the telomere boundary point.
 
+[![DOI](https://zenodo.org/badge/574249235.svg)](https://zenodo.org/doi/10.5281/zenodo.10826386)
+
 ## Getting Started
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
