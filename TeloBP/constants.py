@@ -21,10 +21,10 @@
 # ]
 
 # expectedTeloCompositionP = [
-#     ["T", expectedTeloCompositionQ[0][1]],
-#     ["A", expectedTeloCompositionQ[1][1]],
-#     ["G", expectedTeloCompositionQ[2][1]],
-#     ["C", expectedTeloCompositionQ[3][1]],
+#     ["T", expectedTeloCompositionQ[1][1]],
+#     ["A", expectedTeloCompositionQ[0][1]],
+#     ["G", expectedTeloCompositionQ[3][1]],
+#     ["C", expectedTeloCompositionQ[2][1]],
 #     ["CCC", expectedTeloCompositionQ[4][1]],
 #     ["AA", expectedTeloCompositionQ[5][1]],
 #     ["CCCTAA|CTTCTT|CCCTGG|CCTGG", 6/6, 6],
