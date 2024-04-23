@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import re
 
 from constants import manualLabelsCHM13Positions, manualLabelsCHM13
+import warnings
 
 
 def descriptionToChr(description):
@@ -157,5 +158,4 @@ def validate_seq_teloWindow(seq, teloWindow):
             "teloWindow should be an int greater than or equal to 6")
 
     if len(seq) < teloWindow:
-        raise ValueError(
-            "Error: sequence length must be greater than teloWindow")
+        warnings.warn("Warning: sequence length is less than teloWindow")

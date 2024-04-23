@@ -53,6 +53,10 @@ teloNPTeloCompositionCStrand = [["CTTCTT|CCTGG|CCC(?!CCC)[ATCG]{3}", 6/6, 6]]
 areaDiffsThreshold = 0.2
 
 
+
+errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20}
+
+
 # The following dictionaries are used to test the telomere length and
 # position given by teloBP, and were created by manual inspection
 manualLabelsCHM13Positions = {
