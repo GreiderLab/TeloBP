@@ -41,8 +41,8 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
     try:
         validate_seq_teloWindow(seq, teloWindow)
     except Warning as w:
-        logging.warning(f"Initial validation failed for read, returning {errorReturns["init"]}: {w}")
-        return errorReturns["init"]
+        logging.warning(f"Initial validation failed for read, returning {errorReturns['init']}: {w}")
+        return errorReturns['init']
 
 
     if len(compositionGStrand) == 0:
@@ -55,11 +55,11 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
         isGStrand = getIsGStrandFromSeq(seq, compositionGStrand[targetPatternIndex], compositionCStrand[targetPatternIndex])
         if isGStrand < 0 or not isinstance(isGStrand, bool) and not isinstance(isGStrand, np.bool_):
             # print("Could not determine telomere strand type, returning -1")
-            if isGStrand == errorReturns["fusedRead"]:
+            if isGStrand == errorReturns['fusedRead']:
                 logging.warning(f"Warning: fused strand likely, returning {errorReturns['fusedRead']}")
-                return errorReturns["fusedRead"]
+                return errorReturns['fusedRead']
             logging.warning(f"Warning: could not determine telomere strand type from sequence, returning {errorReturns['strandType']}")
-            return errorReturns["strandType"]
+            return errorReturns['strandType']
         
     composition = []
     if isGStrand:
@@ -153,7 +153,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
                 areaList, composition[targetPatternIndex][0] + " Area", windowStep)
             makeOffsetPlot(ntOffsets, composition,
                            offsetIndexToBPConstant=windowStep)
-        return errorReturns["init"]
+        return errorReturns['init']
 
     # Look through areaDiffs to find point where areaDiffs plateau
     for x in range(indexAtThreshold, len(areaDiffs)-1):
@@ -322,10 +322,10 @@ def getIsGStrandFromSeq(seq, GStrandPatternIn, CStrandPatternIn, searchStrandRep
             return False
         elif gStrandMatchLengths > cStrandMatchLengths:
             return True
-        return errorReturns["strandType"]
+        return errorReturns['strandType']
     
     if min(cStrandCount, gStrandCount) > 100 or abs(cStrandCount - gStrandCount) <= 0.6 * min(cStrandCount, gStrandCount) or min(cStrandCount, gStrandCount) >= fusedReadTeloRepeatThreshold:
-        return errorReturns["fusedRead"]
+        return errorReturns['fusedRead']
 
     if cStrandCount > gStrandCount:
         return False
