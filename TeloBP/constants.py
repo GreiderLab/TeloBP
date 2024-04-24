@@ -21,10 +21,10 @@
 # ]
 
 # expectedTeloCompositionP = [
-#     ["T", expectedTeloCompositionQ[0][1]],
-#     ["A", expectedTeloCompositionQ[1][1]],
-#     ["G", expectedTeloCompositionQ[2][1]],
-#     ["C", expectedTeloCompositionQ[3][1]],
+#     ["T", expectedTeloCompositionQ[1][1]],
+#     ["A", expectedTeloCompositionQ[0][1]],
+#     ["G", expectedTeloCompositionQ[3][1]],
+#     ["C", expectedTeloCompositionQ[2][1]],
 #     ["CCC", expectedTeloCompositionQ[4][1]],
 #     ["AA", expectedTeloCompositionQ[5][1]],
 #     ["CCCTAA|CTTCTT|CCCTGG|CCTGG", 6/6, 6],
@@ -51,6 +51,10 @@ teloNPTeloCompositionCStrand = [["CTTCTT|CCTGG|CCC(?!CCC)[ATCG]{3}", 6/6, 6]]
 # values in the area under the curve is less than this, the slope
 # is considered to be plateauing.
 areaDiffsThreshold = 0.2
+
+
+
+errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20}
 
 
 # The following dictionaries are used to test the telomere length and

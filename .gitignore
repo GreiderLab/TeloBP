@@ -7,5 +7,7 @@
 *.pyc
 Data/
 outputs/trimmedGenome/
+Demo/Data/*
+Demo/output/*
 .venv/
 .vscode/
