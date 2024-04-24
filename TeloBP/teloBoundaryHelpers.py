@@ -42,6 +42,7 @@ def getGraphArea(offsets, targetColumn, windowSize):
     transposed_data = data.T
     areaList = []
     row = transposed_data[targetColumn, :]
+    
     # print(row)
     for i in range(0, len(row) - windowSize, 1):
         area = row[i:i + windowSize].sum()
@@ -133,7 +134,7 @@ def write_bed_file(file_path, bed_data):
 def validate_parameters(seq, isGStrand, composition, teloWindow=100, windowStep=6, plateauDetectionThreshold=-15, changeThreshold=-5, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False):
     
     validate_seq_teloWindow(seq, teloWindow)
-    
+
     if not isinstance(isGStrand, bool) and not isinstance(isGStrand, np.bool_):
         raise ValueError("isGStrand should be a boolean, or numpy boolean")
 
@@ -158,4 +159,4 @@ def validate_seq_teloWindow(seq, teloWindow):
             "teloWindow should be an int greater than or equal to 6")
 
     if len(seq) < teloWindow:
-        warnings.warn("Warning: sequence length is less than teloWindow")
+        raise Warning("sequence length is less than teloWindow")
