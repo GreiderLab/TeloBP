@@ -54,7 +54,7 @@ areaDiffsThreshold = 0.2
 
 
 
-errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20}
+errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20, "seqNotFound": -1000}
 
 
 # The following dictionaries are used to test the telomere length and

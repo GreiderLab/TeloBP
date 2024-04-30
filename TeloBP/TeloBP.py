@@ -6,6 +6,7 @@ import re
 import logging
 
 logging.basicConfig(level=logging.ERROR)
+#logging.basicConfig(level=logging.WARNING)
 
 # The following function takes in a sequence, and returns the index of the telomere boundary.
 def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCStrand = [], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False, secondarySearch = False):
@@ -67,9 +68,16 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
     else:
         composition = compositionCStrand
 
-
+    '''
     validate_parameters(seq, isGStrand, composition, teloWindow, windowStep, plateauDetectionThreshold,
                         changeThreshold, targetPatternIndex, nucleotideGraphAreaWindowSize, showGraphs)
+    '''
+
+    try:
+        validate_parameters(seq, isGStrand, composition, teloWindow, windowStep, plateauDetectionThreshold, changeThreshold, targetPatternIndex, nucleotideGraphAreaWindowSize, showGraphs)
+    except Warning as w:
+        logging.warning(f"Initial validation failed for read, returning {errorReturns['init']}: {w}")
+        return errorReturns['init']
 
     # Move through the sequence in windows of size teloWindow, and step size windowStep,
     # and calculate the offset of the nucleotide composition from the expected telomere composition
@@ -147,7 +155,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
             areaList[y] < plateauDetectionThreshold and (0 > (areaList[y + 1] - areaList[y])))), indexAtThreshold))
 
     if indexAtThreshold == -1:
-        logging.error(f"No telo boundary found, returning {errorReturns['init']}")
+        logging.warning(f"No telo boundary found, returning {errorReturns['init']}")
         if showGraphs:
             graphLine(
                 areaList, composition[targetPatternIndex][0] + " Area", windowStep)
