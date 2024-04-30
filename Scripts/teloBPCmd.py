@@ -97,6 +97,8 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
                 '''
 
                 qnameTeloValues.append([record.id, record.seq])
+        else: 
+            continue
         qnameTeloValuesDf = pd.DataFrame(qnameTeloValues, columns = ["qname", "seq"])
         #sampleQnames[sampleKey] = pd.merge(sampleDf, qnameTeloValuesDf, on='qname', how='left')
         sampleQnames[sampleKey] = qnameTeloValuesDf
