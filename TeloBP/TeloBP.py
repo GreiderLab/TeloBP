@@ -159,8 +159,8 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
         if showGraphs:
             graphLine(
                 areaList, composition[targetPatternIndex][0] + " Area", windowStep)
-            makeOffsetPlot(ntOffsets, composition,
-                           offsetIndexToBPConstant=windowStep)
+            # makeOffsetPlot(ntOffsets, composition,
+            #                offsetIndexToBPConstant=windowStep)
         return errorReturns['init']
 
     # Look through areaDiffs to find point where areaDiffs plateau
@@ -247,7 +247,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
     if showGraphs:
         graphLine(areaList, composition[targetPatternIndex]
                   [0] + " Area", windowStep, boundaryPoint=boundaryPoint)
-        makeOffsetPlot(ntOffsets, composition, windowStep)
+        # makeOffsetPlot(ntOffsets, composition, windowStep)
 
     return boundaryPoint
 

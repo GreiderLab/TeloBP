@@ -52,7 +52,12 @@ def getGraphArea(offsets, targetColumn, windowSize):
 
 
 def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1):
+
     row = rowIn
+    # if boundaryPoint is less than half the x axis, only show boundaryPoint x2 of the data
+    if boundaryPoint < 0.5 * len(rowIn):
+        row = rowIn[:int((2 * boundaryPoint)/windowStep)]
+
     x = np.arange(len(row))
     x = x * windowStep
     fig, ax = plt.subplots()
@@ -75,7 +80,6 @@ def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1):
 
 
 def makeOffsetPlot(offsets, compositions, offsetIndexToBPConstant):
-
     data = np.array(offsets)
     transposed_data = data.T
 
