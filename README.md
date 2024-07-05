@@ -19,6 +19,8 @@ pandas
 numpy
 ```
 
+While TeloBP was developed in Python 3.10, the packages in the requirements.txt file should work with versions up to Python 3.12.
+
 ### Setup
 
 To use TeloBP, clone the repository and run this command to install the required packages:
