@@ -10,42 +10,106 @@ import argparse
 
 sys.path.insert(0, '../TeloBP')
 from TeloBP import *
-from constants import errorReturns
+# from constants import errorReturns
+errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20, "seqNotFound": -1000}
 
 teloNP = False
 outputColName = "teloBPLengths"
 
-def rowToTeloBP(row, teloNP):
+verbose = False
+
+def vprint(*args, **kwargs):
+    if verbose:
+        print(*args, **kwargs)
+
+# def rowToTeloBP(row, teloNP):
+#     import numpy as np
+#     from TeloBP import getTeloNPBoundary, getTeloBoundary
+#     # This if statement is to catch any rows which have NaN in the seq column. 
+#     # Ideally this should not be necessary, but it is here just in case.
+#     if row["seq"] is np.nan:
+#         return errorReturns["seqNotFound"]
+    
+#     teloLength = -1
+#     if teloNP:
+#         teloLength = getTeloNPBoundary(row["seq"])
+#     else:
+#         teloLength = getTeloBoundary(row["seq"])
+#     return teloLength
+
+def rowToTeloBP(row):
+    import sys
+    sys.path.insert(0, '../TeloBP')
     import numpy as np
-    from TeloBP import getTeloNPBoundary
-    # This if statement is to catch any rows which have NaN in the seq column. 
-    # Ideally this should not be necessary, but it is here just in case.
+    from TeloBP import getTeloBoundary
     if row["seq"] is np.nan:
         return errorReturns["seqNotFound"]
-    
     teloLength = -1
-    if teloNP:
-        teloLength = getTeloNPBoundary(row["seq"])
-    else:
-        teloLength = getTeloBoundary(row["seq"])
+    teloLength = getTeloBoundary(row["seq"])
     return teloLength
 
-# def process_data(df):
-#     global teloNP
-#     df[outputColName] = df.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
-#     return df
+def rowToTeloNP(row):
+    import sys
+    sys.path.insert(0, '../TeloBP')
+    import numpy as np
+    from TeloBP import getTeloNPBoundary
+    if row["seq"] is np.nan:
+        return errorReturns["seqNotFound"]
+    teloLength = -1
+    teloLength = getTeloNPBoundary(row["seq"])
+    return teloLength
+
+def process_sampleDf(sampleQnames, sampleKey, outputDir):
+    sampleDf = sampleQnames[sampleKey]
+    inputLen = len(sampleDf)
+    
+    # get current path
+    currentPath = os.path.dirname(os.path.realpath(__file__))
+    vprint(f"Current path: {currentPath}")
+
+    pandarallel.initialize(progress_bar=True)
+    if teloNP:
+        sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloNP,axis=1)
+    else:
+        sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloBP,axis=1)
+
+    vprint(f"inputLen: {inputLen}")
+    vprint(f"outputLen: {len(sampleDf)}")
+    if inputLen != len(sampleDf):
+        print(f"Error: starting length of {inputLen} does not match output table length {len(sampleDf)}")
+
+    # save the output to a csv file. 
+    # Note that the seq column is removed from the table before saving 
+    sampleDf = sampleDf.drop(columns=["seq"])
+    
+    saveDfNoNeg(sampleDf, outputColName, outputDir, sampleKey)
+    return sampleDf
+
+def process_data(df):
+    global teloNP
+    df[outputColName] = df.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
+    return df
+
+def saveDfNoNeg(df, outputColName, outputDir, sampleKey):
+    dfNoNeg = df[df[outputColName] > 0]
+    dfNoNeg.reset_index(drop=True, inplace=True)
+    # create outdir if it doesn't exist
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+    dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv")
 
 # def run_analysis(dataDir, fileMode, teloNP, outputDir, progressLabel, output_frame):
 def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
     global teloNP 
     teloNP = teloNPIn
     if teloNP:
+        global outputColName
         outputColName = "teloNPLengths"
-    print(f'Running analysis on {dataDir}')
+    vprint(f'Running analysis on {dataDir}')
     # Process the selected file or folder
-    print(f"Data type: {'File mode' if fileMode else 'Folder mode'}")
+    vprint(f"Data type: {'File mode' if fileMode else 'Folder mode'}")
     print(f"Use teloNP: {teloNP}")
-    print("beginnging data loading")
+    vprint("Beginnging data loading")
 
     filenames = []
     sampleQnames = {}
@@ -53,152 +117,80 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
     if not fileMode:
         for root, dirs, files in os.walk(dataDir):
             for filename in files:
-                filenames.append((root, filename))
+                if filename.endswith(".gz") or filename.endswith(".fastq"):
+                    filenames.append(os.path.join(root, filename))
     else:
         filenames.append(dataDir)
-        print(filenames)
 
     # progressLabel.config(text=f"Loading fastq files...")
-    print(filenames)
+    vprint(f"filenames: {filenames}")
     
     totalFiles = len(filenames)
     count = 0
     for filename in filenames:
-        if not filename.endswith(".gz") and not filename.endswith(".fastq") or "AG" in filename:
+        if not filename.endswith(".gz") and not filename.endswith(".fastq"):
             continue
 
-        sampleKey = filename.split("/")[-1].split(".")[0].replace(" ", "_")
-        print(f"sampling key: {sampleKey}")
-
-        '''
-        if sampleKey not in sampleQnames.keys():
-            continue
-        sampleDf = sampleQnames[sampleKey]
-        '''
+        sampleKey = "_".join(filename.split("/")[-1].split("\\")[-1].split(".")[:-1]).replace(" ", "_")
+        vprint(f"sampling key: {sampleKey}")
 
         qnameTeloValues = []
         #file = os.path.join(root, filename)
         file = filename
-        print(file)
+        vprint(file)
         if filename.endswith("fastq.gz"):
             with gzip.open(file,"rt") as handle:
                 records = SeqIO.parse(handle,"fastq")
                 for record in records:
-                    '''
-                    if record.id not in sampleDf["qname"].tolist():
-                        continue
-                    '''
                     qnameTeloValues.append([record.id, record.seq])
         elif filename.endswith("fastq"):
-            for record in SeqIO.parse(file,"fastq"):
-                '''
-                if record.id not in sampleDf["qname"].tolist():
-                    continue
-                '''
-
-                qnameTeloValues.append([record.id, record.seq])
+            try:
+                for record in SeqIO.parse(file,"fastq"):
+                    qnameTeloValues.append([record.id, record.seq])
+            except Exception as e:
+                print(f"Error while reading file: {file}")
+                print(e)
         else: 
             continue
         qnameTeloValuesDf = pd.DataFrame(qnameTeloValues, columns = ["qname", "seq"])
         #sampleQnames[sampleKey] = pd.merge(sampleDf, qnameTeloValuesDf, on='qname', how='left')
         sampleQnames[sampleKey] = qnameTeloValuesDf
-        
+
+        sampleQnames[sampleKey] = process_sampleDf(sampleQnames, sampleKey, outputDir)
+
         count += 1
+        
         # progressLabel.config(text=f"Loading fastq files... ({count}/{totalFiles})")
 
-    print("data loaded")
-    # progressLabel.config(text=f"data loaded")
-
-
-    #global outputDir
-    # if totalFiles <= 10:
-    # if fileMode:
-    if 1==2:
-        print("RUNNING SINGLE FILE")
-        
-        # count = 0
-        # # The following will multiprocess the rowToTeloBP function
-        # for sampleKey in sampleQnames.keys():
-        #     sampleDf = sampleQnames[sampleKey]
-        #     inputLen = len(sampleDf)
-
-        #     # def rowToTeloBP(row, teloNP):
-        #     #     import numpy as np
-        #     #     from TeloBP import getTeloNPBoundary
-        #     #     # This if statement is to catch any rows which have NaN in the seq column. 
-        #     #     # Ideally this should not be necessary, but it is here just in case.
-        #     #     if row["seq"] is np.nan:
-        #     #         return -1000
-                
-        #     #     teloLength = -1
-        #     #     if teloNP:
-        #     #         teloLength = getTeloNPBoundary(row["seq"])
-        #     #     else:
-        #     #         teloLength = getTeloBoundary(row["seq"])
-        #     #     return teloLength
-
-        #     # pandarallel.initialize(progress_bar=True)
-        #     # sampleDf[outputColName] = sampleDf.parallel_apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
-
-
-        #     # Split DataFrame into chunks
-        #     n_chunks = mp.cpu_count()  # Number of chunks is equal to the number of cores
-        #     df_chunks = np.array_split(sampleDf, n_chunks)
-
-        #     # Create a multiprocessing Pool
-        #     pool = mp.Pool(n_chunks)
-
-        #     # Process each chunk in parallel
-        #     df_chunks = pool.map(process_data, df_chunks)
-
-        #     # Concatenate the chunks back into a single DataFrame
-        #     sampleDf = pd.concat(df_chunks)
-
-        #     # I highly recommend multi-processing, but if you want to single process,
-        #     # comment out the above two lines and uncomment the following line:
-        #     # sampleDf[outputColName] = sampleDf.apply(lambda row: rowToTeloBP(row), axis=1)
-
-        #     sampleQnames[sampleKey] = sampleDf
-
-        #     print(f"inputLen: {inputLen}")
-        #     print(f"outputLen: {len(sampleDf)}")
-        #     if inputLen != len(sampleDf):
-        #         print(f"Error: input length {inputLen} does not match output length {len(sampleDf)}")
-
-        #     # save the output to a csv file. 
-        #     # Note that the seq column is removed from the table before saving 
-        #     sampleQnames[sampleKey] = sampleQnames[sampleKey].drop(columns=["seq"])
-        #     dfNoNeg = sampleQnames[sampleKey][sampleQnames[sampleKey][outputColName] > 0]
-        #     dfNoNeg.reset_index(drop=True, inplace=True)
-        #     dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv")
-        #     count += 1
-            # progressLabel.config(text=f"Processing tables... ({count}/{totalFiles})")
-    else:
-        print("RUNNING MULTI-PROCESSING")
-        count = 0
-        def process_table(sampleKey):
-            sampleDf = sampleQnames[sampleKey]
+    # The following code does not work at the moment. 
+    # else:
+    #     vprint("RUNNING MULTI-PROCESSING")
+    #     count = 0
+    #     def process_table(sampleKey):
+    #         sampleDf = sampleQnames[sampleKey]
             
-            # Apply the function to each row
-            sampleDf[outputColName] = sampleDf.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
-            # sampleDf[outputColName] = sampleDf.parallel_apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
+    #         # Apply the function to each row
+    #         sampleDf[outputColName] = sampleDf.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
 
-            # Save the output to a csv file. 
-            # Note that the seq column is removed from the table before saving 
-            sampleDf = sampleDf.drop(columns=["seq"])
-            dfNoNeg = sampleQnames[sampleKey][sampleQnames[sampleKey][outputColName] > 0]
-            dfNoNeg.reset_index(drop=True, inplace=True)
-            dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv")
-            nonlocal count
-            count += 1
-            # progressLabel.config(text=f"Processing tables... ({count}/{totalFiles})")
+    #         # Note that the seq column is removed from the table before saving 
+    #         sampleDf = sampleDf.drop(columns=["seq"])
+    #         sampleQnames[sampleKey] = sampleDf
 
-        print(f"******************** Multiprocessing {len(sampleQnames.keys())} tables ********************")
-        print(f"Number of CPUs: {mp.cpu_count()}")
+    #         # Save the output to a csv file. 
+    #         saveDfNoNeg(sampleDf, outputColName, outputDir, sampleKey)
+    #         nonlocal count
+    #         count += 1
+    #         # progressLabel.config(text=f"Processing tables... ({count}/{totalFiles})")
 
-        # Create a pool of processes
-        with mp.Pool(mp.cpu_count()) as pool:
-            pool.map(process_table, sampleQnames.keys())
+    #     vprint(f"******************** Multiprocessing {len(sampleQnames.keys())} tables ********************")
+    #     vprint(f"Number of CPUs: {mp.cpu_count()}")
+
+    #     # Create a pool of processes
+    #     with mp.Pool(mp.cpu_count()) as pool:
+    #         pool.map(process_table, sampleQnames.keys())
+
+
+    # ********** Stats **********
 
     totalReads = 0
     totalReadLengths = 0
@@ -212,34 +204,48 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
     # go through table and see how many lengths are less than 0
     for sampleKey in sampleQnames.keys():
         sampleDf = sampleQnames[sampleKey]
-        print(sampleKey)
-        print(len(sampleDf[sampleDf[outputColName] < 0]))
-        print(f"Total reads: {len(sampleDf)}")
-        print(f"Percentage of reads with teloBP < 0: {len(sampleDf[sampleDf['teloBPLengths'] < 0])/len(sampleDf)*100}%")
-        print(f"Average teloBP length: {sampleDf['teloBPLengths'].mean()}")
-        print(f"Average teloBP length (excluding -ve values): {sampleDf[sampleDf['teloBPLengths'] > 0]['teloBPLengths'].mean()}")
+        sampleTotalReads = len(sampleDf)
+        sampleNonNegativeReads = len(sampleDf[sampleDf[outputColName] >= 0])
+        sampleInitErrors = len(sampleDf[sampleDf[outputColName] == errorReturns["init"]])
+        sampleFusedReadErrors = len(sampleDf[sampleDf[outputColName] == errorReturns["fusedRead"]])
+        sampleStrandTypeErrors = len(sampleDf[sampleDf[outputColName] == errorReturns["strandType"]])
+        sampleSeqNotFound = len(sampleDf[sampleDf[outputColName] == errorReturns["seqNotFound"]])
 
-        totalReads += len(sampleDf)
-        totalReadLengths += sampleDf[outputColName].sum()
-        nonNegativeReads += len(sampleDf[sampleDf[outputColName] >= 0])
-        initErrors += len(sampleDf[sampleDf[outputColName] == errorReturns["init"]])
-        fusedReadErrors += len(sampleDf[sampleDf[outputColName] == errorReturns["fusedRead"]])
-        strandTypeErrors += len(sampleDf[sampleDf[outputColName] == errorReturns["strandType"]])
-        seqNotFound += len(sampleDf[sampleDf[outputColName] == errorReturns["seqNotFound"]])
+        vprint(f"Sample: {sampleKey}")
+        vprint(f"Average teloBP length: {sampleDf[sampleDf[outputColName] >= 0][outputColName].mean()}")
 
-    avgTeloBP = totalReadLengths / nonNegativeReads
+        vprint(f"\nTotal reads (including errors): {sampleTotalReads}")
+        vprint(f"Reads without errors: {sampleNonNegativeReads}")
+        vprint(f"Initialization errors: {sampleInitErrors}")
+        vprint(f"Fused read errors: {sampleFusedReadErrors}")
+        vprint(f"Strand type errors: {sampleStrandTypeErrors}") 
+        vprint(f"Seq not found errors: {sampleSeqNotFound}")
+
+        totalReads += sampleTotalReads
+        totalReadLengths += sampleDf[sampleDf[outputColName] >= 0][outputColName].sum()
+        nonNegativeReads += sampleNonNegativeReads
+        initErrors += sampleInitErrors
+        fusedReadErrors += sampleFusedReadErrors
+        strandTypeErrors += sampleStrandTypeErrors
+        seqNotFound += sampleSeqNotFound
+
+    if nonNegativeReads == 0:
+        avgTeloBP = 0
+    else:
+        avgTeloBP = totalReadLengths / nonNegativeReads
 
     if totalReads == (nonNegativeReads + initErrors + fusedReadErrors + strandTypeErrors + seqNotFound):
-        print("Total reads match")
+        vprint("Total reads match")
     else: 
         print(f"Total reads: {totalReads}")
+        print(f"Average telo length: {avgTeloBP}")
         print(f"Non-negative reads: {nonNegativeReads}")
         print(f"Initialization errors: {initErrors}")
         print(f"Fused read errors: {fusedReadErrors}")
         print(f"Strand type errors: {strandTypeErrors}")
         print(f"Seq not found errors: {seqNotFound}")
 
-        raise Warning("Total reads do not match!!!!!")
+        raise Warning("Error: Total reads do not match. Likely a script error.")
 
     # Data to plot
     # labels = 'Passed Reads', 'initialization error', 'fused read error', 'strand type error', 'seq Not Found'
@@ -266,13 +272,15 @@ if __name__ == "__main__":
     parser.add_argument('dataDir', type=str, help='Path to the data directory')
     parser.add_argument('outputDir', type=str, help='Path to the output directory')
     parser.add_argument('--fileMode', action='store_true', help='Flag to indicate if we are looking at a single file or a direcotry of files')
-    parser.add_argument('--teloNPBool', action='store_true', help='Flag to indicate whether to use teloNP')
+    parser.add_argument('--teloNP', action='store_true', help='Flag to indicate whether to use teloNP')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
+    
     # parser.add_argument('--progressLabel', type=str, help='Progress label')
-    # parser.add_argument('--output_frame', type=str, help='Output frame')
 
     # Parse the command line arguments
     args = parser.parse_args()
+    verbose = args.verbose
 
     # Call the run_analysis function with the parsed arguments
-    run_analysis(args.dataDir, args.fileMode, args.teloNPBool, args.outputDir)
+    run_analysis(args.dataDir, args.fileMode, args.teloNP, args.outputDir)
     # run_analysis("../data", False, True, "../output", None, None)
