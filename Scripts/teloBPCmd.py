@@ -1,3 +1,15 @@
+# This script is used to run the teloBP analysis on a set of fastq files.
+# The script can be run from the command line using the following command:
+# python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [-v]
+# The script takes the following arguments:
+# dataDir: The path to the data directory containing the fastq files to be analyzed. 
+#          OR the path to a single fastq file to be analyzed. set the --fileMode flag to indicate this.
+# outputDir: The path to the output directory where the results will be saved.
+# --fileMode: Flag indicating that a single file is being analyzed.
+# --teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis.
+# -v: Flag to enable verbose output.
+
+
 import os
 from Bio import SeqIO
 import gzip
