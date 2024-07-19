@@ -8,20 +8,7 @@ TeloBP is an algorithm for identifying the telomere boundary in a genomic sequen
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
-### Prerequisites
-
-TeloBP requires the following packages to be installed:
-
-```
-Biopython
-matplotlib
-pandas
-numpy
-```
-
-While TeloBP was developed in Python 3.10, the packages in the requirements.txt file should work with versions up to Python 3.12.
-
-### Setup
+### Setup & Prerequisites
 
 To use TeloBP, clone the repository and run this command to install the required packages:
 
@@ -29,7 +16,37 @@ To use TeloBP, clone the repository and run this command to install the required
 pip install -r requirements.txt
 ```
 
+Alternatively, you can install the following packages manually:
+
+```
+Biopython
+matplotlib
+pandas
+numpy
+pandarallel
+```
+
+While TeloBP was developed in Python 3.10, the packages in the requirements.txt file should work with versions up to Python 3.12.
+
 ## Usage
+
+### TeloBP Command Line Script
+
+In the Scripts directory, the teloBPCmd.py script runs the teloBP analysis on a set of fastq files.
+The script can be run from the command line using the following command:
+```
+python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [-v]
+```
+The script takes the following arguments:
+dataDir: The path to the data directory containing the fastq files to be analyzed. 
+         OR the path to a single fastq file to be analyzed. Set the --fileMode flag to indicate this.
+outputDir: The path to the output directory where the results will be saved.
+--fileMode: Flag indicating that a single file is being analyzed.
+--teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis. 
+          More details on the difference between TeloBP and TeloNP can be found below. 
+-v: Flag to enable verbose output.
+
+The script will output a .csv file containing read qnames and telomere length values for all the reads which passed basic filtering. 
 
 ### Genome Trimming
 
