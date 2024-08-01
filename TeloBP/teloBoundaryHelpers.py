@@ -51,7 +51,7 @@ def getGraphArea(offsets, targetColumn, windowSize):
     return areaList
 
 
-def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1):
+def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1, pdfOut=None):
 
     row = rowIn
     # if boundaryPoint is less than half the x axis, only show boundaryPoint x2 of the data
@@ -75,8 +75,11 @@ def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1):
     # Show legend
     ax.legend()
 
-    # Display the graph
-    plt.show()
+    if pdfOut is not None:
+        pdfOut.savefig(fig)
+    elif pdfOut is None:
+        # Display the graph
+        plt.show()
 
 
 def makeOffsetPlot(offsets, compositions, offsetIndexToBPConstant):

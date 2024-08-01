@@ -7,6 +7,9 @@
 # outputDir: The path to the output directory where the results will be saved.
 # --fileMode: Flag indicating that a single file is being analyzed.
 # --teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis.
+# --targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
+# --save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
+# The program will run in single threaded mode when --save_graphs is set to True.
 # -v: Flag to enable verbose output.
 
 
@@ -19,6 +22,7 @@ import multiprocessing as mp
 from pandarallel import pandarallel
 import sys
 import argparse
+from matplotlib.backends.backend_pdf import PdfPages
 
 sys.path.insert(0, '../TeloBP')
 from TeloBP import *
@@ -26,6 +30,8 @@ from TeloBP import *
 errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20, "seqNotFound": -1000}
 
 teloNP = False
+pdf = PdfPages('teloGraphs.pdf')
+showGraphsGlobal = False
 outputColName = "teloBPLengths"
 
 verbose = False
@@ -49,26 +55,45 @@ def vprint(*args, **kwargs):
 #         teloLength = getTeloBoundary(row["seq"])
 #     return teloLength
 
-def rowToTeloBP(row):
+def rowToTeloBP(row, sampleKey, showGraphsGlobal):
     import sys
     sys.path.insert(0, '../TeloBP')
     import numpy as np
+    import matplotlib.pyplot as plt
     from TeloBP import getTeloBoundary
     if row["seq"] is np.nan:
         return errorReturns["seqNotFound"]
     teloLength = -1
-    teloLength = getTeloBoundary(row["seq"])
+    
+    pdfLocal = None
+    if showGraphsGlobal:
+        global pdf
+        plt.figure()
+        plt.text(0.5, 0.5, f'Sample Key: {sampleKey}, Qname: {row["qname"]}', ha='center', va='center', fontsize=12)
+        plt.axis('off')
+        pdf.savefig()  # Save the text figure
+        pdfLocal = pdf
+    teloLength = getTeloBoundary(row["seq"], showGraphs = showGraphsGlobal, pdf = pdfLocal)
     return teloLength
 
-def rowToTeloNP(row):
+def rowToTeloNP(row, sampleKey, showGraphsGlobal):
     import sys
     sys.path.insert(0, '../TeloBP')
     import numpy as np
+    import matplotlib.pyplot as plt
     from TeloBP import getTeloNPBoundary
     if row["seq"] is np.nan:
         return errorReturns["seqNotFound"]
     teloLength = -1
-    teloLength = getTeloNPBoundary(row["seq"])
+
+    pdfLocal = None
+    if showGraphsGlobal:
+        plt.figure()
+        plt.text(0.5, 0.5, f'Sample Key: {sampleKey}, Qname: {row["qname"]}', ha='center', va='center', fontsize=9)
+        plt.axis('off')
+        pdf.savefig()  # Save the text figure
+        pdfLocal = pdf
+    teloLength = getTeloNPBoundary(row["seq"],showGraphs = showGraphsGlobal, pdf = pdfLocal)
     return teloLength
 
 def process_sampleDf(sampleQnames, sampleKey, outputDir):
@@ -79,11 +104,16 @@ def process_sampleDf(sampleQnames, sampleKey, outputDir):
     currentPath = os.path.dirname(os.path.realpath(__file__))
     vprint(f"Current path: {currentPath}")
 
-    pandarallel.initialize(progress_bar=True)
+    
+    if not showGraphsGlobal:
+        pandarallel.initialize(progress_bar=True)
     if teloNP:
-        sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloNP,axis=1)
+        if showGraphsGlobal:
+            sampleDf[outputColName] = sampleDf.apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal))
+        else:
+            sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal))
     else:
-        sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloBP,axis=1)
+        sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloBP,axis=1, args=(sampleKey, showGraphsGlobal))
 
     vprint(f"inputLen: {inputLen}")
     vprint(f"outputLen: {len(sampleDf)}")
@@ -111,7 +141,7 @@ def saveDfNoNeg(df, outputColName, outputDir, sampleKey):
     dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv")
 
 # def run_analysis(dataDir, fileMode, teloNP, outputDir, progressLabel, output_frame):
-def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
+def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targetQnamesCSV=None):
     global teloNP 
     teloNP = teloNPIn
     if teloNP:
@@ -123,6 +153,18 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
     print(f"Use teloNP: {teloNP}")
     vprint("Beginnging data loading")
 
+    if targetQnamesCSV is None and save_graphs:
+        print("WARNING: save_graphs flag is set but no targetQnamesCSV file is provided. This configuration would likely crash the program, so the save_graphs flag will be set to False. If this was your intention, please modify the code.")
+        save_graphs = False
+    elif targetQnamesCSV is not None and save_graphs:
+        global showGraphsGlobal
+        showGraphsGlobal = True
+    
+    targetQnames = None
+    if targetQnamesCSV is not None:
+        targetQnames = pd.read_csv(targetQnamesCSV, header=None)
+        targetQnames = set(targetQnames[0].to_list())
+    
     filenames = []
     sampleQnames = {}
 
@@ -154,17 +196,29 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
             with gzip.open(file,"rt") as handle:
                 records = SeqIO.parse(handle,"fastq")
                 for record in records:
+                    if targetQnames is not None and record.id not in targetQnames:
+                        continue
+                    print(record.id)
                     qnameTeloValues.append([record.id, record.seq])
         elif filename.endswith("fastq"):
             try:
                 for record in SeqIO.parse(file,"fastq"):
+                    if targetQnames is not None and record.id not in targetQnames:
+                        continue
+                    print(record.id)
                     qnameTeloValues.append([record.id, record.seq])
             except Exception as e:
                 print(f"Error while reading file: {file}")
                 print(e)
         else: 
             continue
+
         qnameTeloValuesDf = pd.DataFrame(qnameTeloValues, columns = ["qname", "seq"])
+
+        if len(qnameTeloValuesDf) == 0:
+            vprint(f"No records in file: {file}")
+            continue
+
         #sampleQnames[sampleKey] = pd.merge(sampleDf, qnameTeloValuesDf, on='qname', how='left')
         sampleQnames[sampleKey] = qnameTeloValuesDf
 
@@ -201,6 +255,8 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir):
     #     with mp.Pool(mp.cpu_count()) as pool:
     #         pool.map(process_table, sampleQnames.keys())
 
+    # Save pdf
+    pdf.close()
 
     # ********** Stats **********
 
@@ -286,6 +342,8 @@ if __name__ == "__main__":
     parser.add_argument('--fileMode', action='store_true', help='Flag to indicate if we are looking at a single file or a direcotry of files')
     parser.add_argument('--teloNP', action='store_true', help='Flag to indicate whether to use teloNP')
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
+    parser.add_argument('--save_graphs', action='store_true', help='Flag to indicate whether to save graphs')
+    parser.add_argument('--targetQnamesCSV', type=str, help='Path to an input csv that has the qnammes we want to test')  # Optional argument for input file
     
     # parser.add_argument('--progressLabel', type=str, help='Progress label')
 
@@ -294,5 +352,5 @@ if __name__ == "__main__":
     verbose = args.verbose
 
     # Call the run_analysis function with the parsed arguments
-    run_analysis(args.dataDir, args.fileMode, args.teloNP, args.outputDir)
+    run_analysis(args.dataDir, args.fileMode, args.teloNP, args.outputDir, save_graphs=args.save_graphs, targetQnamesCSV=args.targetQnamesCSV)
     # run_analysis("../data", False, True, "../output", None, None)

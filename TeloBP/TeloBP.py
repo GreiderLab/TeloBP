@@ -5,11 +5,13 @@ from Bio import SeqIO
 import re
 import logging
 
+
+
 logging.basicConfig(level=logging.ERROR)
 #logging.basicConfig(level=logging.WARNING)
 
 # The following function takes in a sequence, and returns the index of the telomere boundary.
-def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCStrand = [], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, returnLastDiscontinuity=False, secondarySearch = False):
+def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCStrand = [], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, pdf=None, returnLastDiscontinuity=False, secondarySearch = False):
     """
     This function takes in a sequence, and returns the index of the telomere boundary.
 
@@ -32,6 +34,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
            More specifically, this value must be large enough that it can "look into" the area well past the telomere boundary, making sure that the 
            discontinuity in the telomere pattern is sustained.
     :param showGraphs: Boolean value, if true, the graphs will be shown.
+    :param pdf: A pdf object, if provided, the graphs will be saved to the pdf.
     :param returnLastDiscontinuity: Boolean value, if true, the algorithm will return the last possible point of discontinuity, rather than the first.
            For sequences which are very noisy, this may be necessary, as the first point of discontinuity may be a false positive.
     """
@@ -44,7 +47,6 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
     except Warning as w:
         logging.warning(f"Initial validation failed for read, returning {errorReturns['init']}: {w}")
         return errorReturns['init']
-
 
     if len(compositionGStrand) == 0:
         compositionGStrand = expectedTeloCompositionQ
@@ -157,8 +159,9 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
     if indexAtThreshold == -1:
         logging.warning(f"No telo boundary found, returning {errorReturns['init']}")
         if showGraphs:
+            print(f"showGraph:  {showGraphs}")
             graphLine(
-                areaList, composition[targetPatternIndex][0] + " Area", windowStep)
+                areaList, composition[targetPatternIndex][0] + " Area", windowStep, pdfOut=pdf)
             # makeOffsetPlot(ntOffsets, composition,
             #                offsetIndexToBPConstant=windowStep)
         return errorReturns['init']
@@ -196,7 +199,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
             if len(scanSeq) < 100:
                 logging.debug("Warning: Sequence was not long enough to perform secondary search, returning original boundary point")
             else:
-                secBoundary = getTeloBoundary(scanSeq, isGStrand, composition, teloWindow=90, windowStep=6, changeThreshold=changeThreshold, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=100, showGraphs=showGraphs, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=False)
+                secBoundary = getTeloBoundary(scanSeq, isGStrand, composition, teloWindow=90, windowStep=6, changeThreshold=changeThreshold, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=100, showGraphs=False, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=False)
 
                 tempBoundary = boundaryPoint + secBoundary - telomereOffset
                 if upperIndex == len(seq):
@@ -224,7 +227,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
             if len(scanSeq) < 100:
                 logging.debug("Warning: Sequence was not long enough to perform secondary search, returning original boundary point")
             else:
-                secBoundary = getTeloBoundary(scanSeq, isGStrand, composition, teloWindow=90, windowStep=6, changeThreshold=changeThreshold, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=100, showGraphs=showGraphs, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=False)
+                secBoundary = getTeloBoundary(scanSeq, isGStrand, composition, teloWindow=90, windowStep=6, changeThreshold=changeThreshold, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=100, showGraphs=False, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=False)
 
                 tempBoundary = boundaryPoint + secBoundary - telomereOffset
                 if lowerIndex == 0:
@@ -246,7 +249,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
 
     if showGraphs:
         graphLine(areaList, composition[targetPatternIndex]
-                  [0] + " Area", windowStep, boundaryPoint=boundaryPoint)
+                  [0] + " Area", windowStep, boundaryPoint=boundaryPoint, pdfOut=pdf)
         # makeOffsetPlot(ntOffsets, composition, windowStep)
 
     return boundaryPoint
@@ -354,5 +357,5 @@ def isGStrand(chrArm,strand):
     
 
 
-def getTeloNPBoundary(seq, isGStrand=None, compositionCStrandIn=teloNPTeloCompositionCStrand, compositionGStrandIn=teloNPTeloCompositionGStrand, teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=750, showGraphs=False, returnLastDiscontinuity=True, secondarySearch = True):
-    return getTeloBoundary(seq, isGStrand, compositionCStrand=compositionCStrandIn, compositionGStrand=compositionGStrandIn, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch)
+def getTeloNPBoundary(seq, isGStrand=None, compositionCStrandIn=teloNPTeloCompositionCStrand, compositionGStrandIn=teloNPTeloCompositionGStrand, teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=750, showGraphs=False, pdf=None, returnLastDiscontinuity=True, secondarySearch = True):
+    return getTeloBoundary(seq, isGStrand, compositionCStrand=compositionCStrandIn, compositionGStrand=compositionGStrandIn, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, pdf=pdf, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch)

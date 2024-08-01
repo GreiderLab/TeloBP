@@ -34,19 +34,24 @@ While TeloBP was developed in Python 3.10, the packages in the requirements.txt 
 
 In the Scripts directory, the teloBPCmd.py script runs the teloBP analysis on a set of fastq files.
 The script can be run from the command line using the following command:
+
 ```
-python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [-v]
+python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [-v] [--targetQnamesCSV <csv file>] [--save_graphs]
 ```
+
 The script takes the following arguments:
-dataDir: The path to the data directory containing the fastq files to be analyzed. 
-         OR the path to a single fastq file to be analyzed. Set the --fileMode flag to indicate this.
+dataDir: The path to the data directory containing the fastq files to be analyzed.
+OR the path to a single fastq file to be analyzed. Set the --fileMode flag to indicate this.
 outputDir: The path to the output directory where the results will be saved.
 --fileMode: Flag indicating that a single file is being analyzed.
---teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis. 
-          More details on the difference between TeloBP and TeloNP can be found below. 
+--teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis.
+More details on the difference between TeloBP and TeloNP can be found below.
+--targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
+--save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
+The program will run in single threaded mode when --save_graphs is set to True.
 -v: Flag to enable verbose output.
 
-The script will output a .csv file containing read qnames and telomere length values for all the reads which passed basic filtering. 
+The script will output a .csv file containing read qnames and telomere length values for all the reads which passed basic filtering.
 
 ### Genome Trimming
 
