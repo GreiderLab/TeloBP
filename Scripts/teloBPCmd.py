@@ -24,7 +24,7 @@ import sys
 import argparse
 from matplotlib.backends.backend_pdf import PdfPages
 
-sys.path.insert(0, '../TeloBP')
+# sys.path.insert(0, '../TeloBP')
 from TeloBP import *
 # from constants import errorReturns
 errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20, "seqNotFound": -1000}

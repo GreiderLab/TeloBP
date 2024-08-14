@@ -9,5 +9,8 @@ Data/
 outputs/trimmedGenome/
 Demo/Data/*
 Demo/output/*
+Scripts/output/*
+Scripts/Data/*
 .venv/
 .vscode/
+TeloBP.egg-info/*

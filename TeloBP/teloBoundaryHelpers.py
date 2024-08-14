@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 
-from constants import manualLabelsCHM13Positions, manualLabelsCHM13
+from TeloBP.constants import manualLabelsCHM13Positions, manualLabelsCHM13
 import warnings
 
 
@@ -131,6 +131,13 @@ def testTeloLength(chr, length, testDict=manualLabelsCHM13):
     # print(chr + " offset: " + str(length - expectedLength) + "bp (obs - exp)")
     return (length - expectedLength)
 
+def recordBedData(bed_data, record, startTeloLength, endTeloLength):
+    chrName = record.id
+    pEndIndex = startTeloLength
+    bed_data.append([chrName, pEndIndex-6, pEndIndex, chrName])
+    
+    qEndIndex = len(record.seq)-endTeloLength
+    bed_data.append([chrName, qEndIndex, qEndIndex+6, chrName])
 
 def write_bed_file(file_path, bed_data):
     with open(file_path, 'w') as bed_file:

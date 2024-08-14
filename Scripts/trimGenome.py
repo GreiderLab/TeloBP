@@ -3,16 +3,18 @@
 
 import sys
 
-sys.path.insert(0, '..\TeloBP')
+# sys.path.insert(0, '..\TeloBP')
 
 from TeloBP import trimTeloReferenceGenome
 
 # Check if the correct number of arguments were passed
-if len(sys.argv) != 3:
-    print("Usage: python trimGenome.py <reference genome> <output file>")
+if len(sys.argv) < 3 or len(sys.argv) > 4:
+    print("Usage: python trimGenome.py <reference genome> <output file> [output bed file]")
     sys.exit()
+    
+bedFileOutput = sys.argv[3] if len(sys.argv) == 4 else None
 
 # Call the function to trim the reference genome
 # NOTE: This algorithm assumes that each chromosome is its own read, and not split into
 # q and p arms.
-trimTeloReferenceGenome(sys.argv[1], sys.argv[2])
+trimTeloReferenceGenome(sys.argv[1], sys.argv[2], bedFileOutput)

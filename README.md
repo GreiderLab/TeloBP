@@ -10,10 +10,10 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Setup & Prerequisites
 
-To use TeloBP, clone the repository and run this command to install the required packages:
+To use TeloBP, clone the repository and run this command to install TeloBP and its required packages:
 
 ```
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Alternatively, you can install the following packages manually:
@@ -55,13 +55,23 @@ The script will output a .csv file containing read qnames and telomere length va
 
 ### Genome Trimming
 
-The scripts folder contains the script "trimGenome.py" which has parameters preset for removing the telomeres on a genome. The script can be run with the following command:
+The "trimGenome.py" file has parameters preset for removing the telomeres on a genome. The script can be run with the following command:
 
 ```
-python trimGenome.py <genome_file> <output_file>
+python trimGenome.py <genome_file> <output_file> [output bed file]
 ```
+
+If an output file path is giving as a third argument, a bed file containing telomere boundary coordinates for the ORIGINAL genome file will be created. The trimmed genome will simply cut the genome at these coordinates.
 
 **NOTE**: This algorithm assumes that each chromosome is its own read, and not split into q and p arms.
+
+### Genome Bed File Creator
+
+This script will create a bed file containing the telomere boundary coordinates for a given genome. The script can be run with the following command:
+
+```
+python teloBPBedGenome.py <reference genome> <output bed file>
+```
 
 ### TeloBP Function Arguments
 

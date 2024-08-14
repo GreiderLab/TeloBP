@@ -1,5 +1,5 @@
-from teloBoundaryHelpers import *
-from constants import expectedTeloCompositionQ, expectedTeloCompositionP, areaDiffsThreshold, teloNPTeloCompositionGStrand, teloNPTeloCompositionCStrand, errorReturns
+from TeloBP.teloBoundaryHelpers import *
+from TeloBP.constants import expectedTeloCompositionQ, expectedTeloCompositionP, areaDiffsThreshold, teloNPTeloCompositionGStrand, teloNPTeloCompositionCStrand, errorReturns
 import numpy as np
 from Bio import SeqIO
 import re
@@ -261,15 +261,25 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
 # NOTE: This algorithm assumes that each chromosome is its own read, and not split into
 # q and p arms.
 
-def trimTeloReferenceGenome(filename, outputFilename, subSec = None, compositionCStrandIn=expectedTeloCompositionP, compositionGStrandIn=expectedTeloCompositionQ, teloWindowIn=100, windowStepIn=6, plateauDetectionThresholdIn=-60, changeThresholdIn=-20, targetPatternIndexIn=-1, nucleotideGraphAreaWindowSizeIn=500, showGraphsIn=False, returnLastDiscontinuityIn=False, secondarySearchIn = False):
+def refRecordTeloLengths(record, searchSize = 500000, compositionCStrandIn=expectedTeloCompositionP, compositionGStrandIn=expectedTeloCompositionQ, teloWindowIn=100, windowStepIn=6, plateauDetectionThresholdIn=-60, changeThresholdIn=-20, targetPatternIndexIn=-1, nucleotideGraphAreaWindowSizeIn=500, showGraphsIn=False, returnLastDiscontinuityIn=False, secondarySearchIn = False):
+    startTeloLength = getTeloBoundary(record.seq[:searchSize], isGStrand=False,  compositionGStrand = compositionGStrandIn, compositionCStrand=compositionCStrandIn, teloWindow=teloWindowIn, windowStep=windowStepIn, plateauDetectionThreshold=plateauDetectionThresholdIn, changeThreshold=changeThresholdIn,
+                                          targetPatternIndex=targetPatternIndexIn, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSizeIn, showGraphs=showGraphsIn, returnLastDiscontinuity=returnLastDiscontinuityIn, secondarySearch = secondarySearchIn)
+    endTeloLength = getTeloBoundary(record.seq[-searchSize:], isGStrand=True,  compositionGStrand = compositionGStrandIn, compositionCStrand=compositionCStrandIn, teloWindow=teloWindowIn, windowStep=windowStepIn, plateauDetectionThreshold=plateauDetectionThresholdIn, changeThreshold=changeThresholdIn,
+                                    targetPatternIndex=targetPatternIndexIn, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSizeIn, showGraphs=showGraphsIn, returnLastDiscontinuity=returnLastDiscontinuityIn, secondarySearch = secondarySearchIn)
+    return startTeloLength, endTeloLength
+
+
+def trimTeloReferenceGenome(filename, outputFilename, bedFileName = None, subSec = None, compositionCStrandIn=expectedTeloCompositionP, compositionGStrandIn=expectedTeloCompositionQ, teloWindowIn=100, windowStepIn=6, plateauDetectionThresholdIn=-60, changeThresholdIn=-20, targetPatternIndexIn=-1, nucleotideGraphAreaWindowSizeIn=500, showGraphsIn=False, returnLastDiscontinuityIn=False, secondarySearchIn = False):
     trimmed_sequences = []
+    bed_data = []
 
     # Trims the records and saves them
     for record in SeqIO.parse(filename, "fasta"):
-        startTeloLength = getTeloBoundary(record.seq[:500000], isGStrand=False,  compositionGStrand = compositionGStrandIn, compositionCStrand=compositionCStrandIn, teloWindow=teloWindowIn, windowStep=windowStepIn, plateauDetectionThreshold=plateauDetectionThresholdIn, changeThreshold=changeThresholdIn,
-                                          targetPatternIndex=targetPatternIndexIn, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSizeIn, showGraphs=showGraphsIn, returnLastDiscontinuity=returnLastDiscontinuityIn, secondarySearch = secondarySearchIn)
-        endTeloLength = getTeloBoundary(record.seq[-500000:], isGStrand=True,  compositionGStrand = compositionGStrandIn, compositionCStrand=compositionCStrandIn, teloWindow=teloWindowIn, windowStep=windowStepIn, plateauDetectionThreshold=plateauDetectionThresholdIn, changeThreshold=changeThresholdIn,
-                                        targetPatternIndex=targetPatternIndexIn, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSizeIn, showGraphs=showGraphsIn, returnLastDiscontinuity=returnLastDiscontinuityIn, secondarySearch = secondarySearchIn)
+        startTeloLength, endTeloLength = refRecordTeloLengths(record, compositionCStrandIn=compositionCStrandIn, compositionGStrandIn=compositionGStrandIn, teloWindowIn=teloWindowIn, windowStepIn=windowStepIn, plateauDetectionThresholdIn=plateauDetectionThresholdIn, changeThresholdIn=changeThresholdIn, targetPatternIndexIn=targetPatternIndexIn, nucleotideGraphAreaWindowSizeIn=nucleotideGraphAreaWindowSizeIn, showGraphsIn=showGraphsIn, returnLastDiscontinuityIn=returnLastDiscontinuityIn, secondarySearchIn = secondarySearchIn)
+        
+        if bedFileName != None:
+            recordBedData(bed_data, record, startTeloLength, endTeloLength)
+
         if subSec == None:
             trimmed_sequences.append(record[startTeloLength:-endTeloLength])
         else:
@@ -281,6 +291,9 @@ def trimTeloReferenceGenome(filename, outputFilename, subSec = None, composition
             gStrand.id = gStrand.id + "_G"
             trimmed_sequences.append(cStrand)
             trimmed_sequences.append(gStrand)
+    
+    if bedFileName != None:
+        write_bed_file(bedFileName, bed_data)
 
     # Write the trimmed sequences to the output file
     SeqIO.write(trimmed_sequences, outputFilename, "fasta")
