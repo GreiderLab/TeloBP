@@ -5,12 +5,22 @@ setup(
     version='0.1',
     packages=find_packages(),
     install_requires=[
-        'biopython==1.81',
-        'matplotlib==3.7.3',
-        'matplotlib-inline==0.1.6',
-        'numpy==1.26.0',
-        'pandas==2.2.0',
-        'pyparsing==3.1.1',
-        'zipp==3.16.2'
+        'biopython',
+        'matplotlib',
+        'matplotlib-inline',
+        'numpy',
+        'pandas',
+        'pyparsing',
+        'pandarallel',
+        'zipp'
     ],
+    # install_requires=[
+    #     'biopython==1.81',
+    #     'matplotlib==3.7.3',
+    #     'matplotlib-inline==0.1.6',
+    #     'numpy==1.26.0',
+    #     'pandas==2.2.0',
+    #     'pyparsing==3.1.1',
+    #     'zipp==3.16.2'
+    # ],
 )

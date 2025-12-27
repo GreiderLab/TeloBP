@@ -123,3 +123,16 @@ Now we need to mark the point at which the offset score changes. To make sure th
 Here, we can expect to see the graph spike around the telomere boundary point. We scan ahead till we get an area value below the plateauDetectionThreshold, then start measuring the difference between area values till the slope plateaus. This is the point at which the telomeric pattern breaks, and is the telomere boundary point.
 
 If "returnLastDiscontinuity" is set to True, we will look backwards till we reach a point above the changeThreshold value, then scan ahead till we get an area value below the plateauDetectionThreshold. This is useful for very noisy reads, where the first discontinuity may be a false positive.
+
+
+
+
+## Dependencies used during development: 
+- Python 3.10
+- biopython==1.81
+- matplotlib==3.7.3
+- matplotlib-inline==0.1.6
+- numpy==1.26.0
+- pandas==2.2.0
+- pyparsing==3.1.1
+- zipp==3.16.2
