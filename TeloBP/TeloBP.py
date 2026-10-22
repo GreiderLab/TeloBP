@@ -4,6 +4,7 @@ import numpy as np
 from Bio import SeqIO
 import re
 import logging
+import inspect
 
 
 
@@ -372,8 +373,8 @@ def isGStrand(chrArm,strand):
     
 
 
-# chemistry selects the preset from teloNPPresets: "R10" (default) or "R9" for Guppy-basecalled R9.4.1 reads.
-# Any argument left as None takes the preset's value.
+# chemistry selects the preset from teloNPPresets: "R10" (default), "R9" for Guppy-basecalled R9.4.1 reads,
+# or "R9_archive" to reproduce results from TeloNP v1. Any argument left as None takes the preset's value.
 def getTeloNPBoundary(seq, isGStrand=None, compositionCStrandIn=None, compositionGStrandIn=None, teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=None, showGraphs=False, pdf=None, returnLastDiscontinuity=None, secondarySearch = True, chemistry="R10", maxDiscontinuityGap=None):
     if chemistry not in teloNPPresets:
         raise ValueError(f"chemistry should be one of {list(teloNPPresets.keys())}, got {chemistry}")
@@ -389,3 +390,25 @@ def getTeloNPBoundary(seq, isGStrand=None, compositionCStrandIn=None, compositio
     if maxDiscontinuityGap is None:
         maxDiscontinuityGap = preset["maxDiscontinuityGap"]
     return getTeloBoundary(seq, isGStrand, compositionCStrand=compositionCStrandIn, compositionGStrand=compositionGStrandIn, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, pdf=pdf, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch, maxDiscontinuityGap=maxDiscontinuityGap)
+
+
+# The following functions return the full set of settings a default call uses, so they can be saved
+# alongside results. Arguments that don't change the result (the sequence, strand and graph options) are left out.
+_notSettings = ("seq", "isGStrand", "showGraphs", "pdf")
+
+def getTeloNPSettings(chemistry="R10"):
+    if chemistry not in teloNPPresets:
+        raise ValueError(f"chemistry should be one of {list(teloNPPresets.keys())}, got {chemistry}")
+    params = inspect.signature(getTeloNPBoundary).parameters
+    settings = {name: p.default for name, p in params.items() if name not in _notSettings and p.default is not None}
+    settings["chemistry"] = chemistry
+    settings.update(teloNPPresets[chemistry])
+    return settings
+
+def getTeloBPSettings():
+    params = inspect.signature(getTeloBoundary).parameters
+    settings = {name: p.default for name, p in params.items() if name not in _notSettings}
+    # empty composition lists mean the default compositions
+    settings["compositionGStrand"] = expectedTeloCompositionQ
+    settings["compositionCStrand"] = expectedTeloCompositionP
+    return settings

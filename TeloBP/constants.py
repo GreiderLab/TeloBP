@@ -50,12 +50,21 @@ teloNPR10TeloCompositionGStrand = [["TTAGGG|[ACG]TAGGG|T[ACG]AGGG|TT[CGT]GGG|TTA
 teloNPR10TeloCompositionCStrand = [["CCCTAA|[AGT]CCTAA|C[AGT]CTAA|CC[AGT]TAA|CCC[ACG]AA|CCCT[CGT]A|CCCTA[CGT]", 6/6, 6]]
 
 # getTeloNPBoundary settings for each nanopore chemistry.
-# R9: the original TeloNP settings, for R9.4.1 reads basecalled with Guppy. The patterns accept Guppy's
-#     telomere miscalls, and the last discontinuity is returned to step over gaps in noisy reads.
 # R10: for R10.4.1 reads (Dorado). The first discontinuity is returned, stepping over gaps only when
 #      telomere sequence resumes within maxDiscontinuityGap bp, so a distant ITS is not counted as telomere.
+# R9: for R9.4.1 reads basecalled with Guppy. The patterns accept Guppy's telomere miscalls, with the
+#     same bounded gap search as R10.
+# R9_archive: the original TeloNP settings (v1), kept unchanged so earlier results can be reproduced.
+#     It returns the last discontinuity in the read, so an ITS far from the telomere can be counted as telomere.
 teloNPPresets = {
     "R9": {
+        "compositionGStrand": teloNPTeloCompositionGStrand,
+        "compositionCStrand": teloNPTeloCompositionCStrand,
+        "nucleotideGraphAreaWindowSize": 750,
+        "returnLastDiscontinuity": False,
+        "maxDiscontinuityGap": 2000,
+    },
+    "R9_archive": {
         "compositionGStrand": teloNPTeloCompositionGStrand,
         "compositionCStrand": teloNPTeloCompositionCStrand,
         "nucleotideGraphAreaWindowSize": 750,

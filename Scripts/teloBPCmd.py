@@ -1,13 +1,14 @@
 # This script is used to run the teloBP analysis on a set of fastq files.
 # The script can be run from the command line using the following command:
-# python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9] [-v]
+# python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9|R9_archive] [-v]
 # The script takes the following arguments:
 # dataDir: The path to the data directory containing the fastq files to be analyzed. 
 #          OR the path to a single fastq file to be analyzed. set the --fileMode flag to indicate this.
 # outputDir: The path to the output directory where the results will be saved.
 # --fileMode: Flag indicating that a single file is being analyzed.
 # --teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis.
-# --chemistry: The nanopore chemistry TeloNP settings are chosen for. R10 (default) or R9 for Guppy-basecalled R9.4.1 reads.
+# --chemistry: The nanopore chemistry TeloNP settings are chosen for. R10 (default), R9 for Guppy-basecalled R9.4.1 reads,
+#              or R9_archive to reproduce results from TeloNP v1.
 # --targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
 # --save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
 # The program will run in single threaded mode when --save_graphs is set to True.
@@ -23,7 +24,13 @@ import multiprocessing as mp
 from pandarallel import pandarallel
 import sys
 import argparse
+import json
+import platform
+import subprocess
+from datetime import datetime, timezone
+import Bio
 from matplotlib.backends.backend_pdf import PdfPages
+import TeloBP as teloBPPackage
 
 # sys.path.insert(0, '../TeloBP')
 from TeloBP import *
@@ -133,6 +140,36 @@ def process_data(df):
     global teloNP
     df[outputColName] = df.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
     return df
+
+def getGitCommit():
+    # The commit of the TeloBP checkout being run, with "-dirty" if it has uncommitted changes.
+    # None when TeloBP wasn't installed from a git checkout.
+    packageDir = os.path.dirname(os.path.realpath(teloBPPackage.__file__))
+    try:
+        commit = subprocess.run(["git", "-C", packageDir, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "-C", packageDir, "status", "--porcelain", "--untracked-files=no"], capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return commit + ("-dirty" if dirty else "")
+
+def writeRunMetadata(outputDir, filenames, sampleQnames):
+    # Saves the version and settings of this run next to its results, so they can be reproduced
+    metadata = {
+        "teloBPVersion": teloBPPackage.__version__,
+        "gitCommit": getGitCommit(),
+        "runAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "command": " ".join(sys.argv),
+        "method": "TeloNP" if teloNP else "TeloBP",
+        "settings": getTeloNPSettings(chemistryGlobal) if teloNP else getTeloBPSettings(),
+        "inputFiles": filenames,
+        "readsPerSample": {sampleKey: len(sampleDf) for sampleKey, sampleDf in sampleQnames.items()},
+        "python": platform.python_version(),
+        "packages": {"biopython": Bio.__version__, "numpy": np.__version__, "pandas": pd.__version__},
+    }
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+    with open(f"{outputDir}/teloBP_run_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
 
 def saveDfNoNeg(df, outputColName, outputDir, sampleKey):
     dfNoNeg = df[df[outputColName] > 0]
@@ -261,6 +298,8 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
     # Save pdf
     pdf.close()
 
+    writeRunMetadata(outputDir, filenames, sampleQnames)
+
     # ********** Stats **********
 
     totalReads = 0
@@ -344,7 +383,7 @@ if __name__ == "__main__":
     parser.add_argument('outputDir', type=str, help='Path to the output directory')
     parser.add_argument('--fileMode', action='store_true', help='Flag to indicate if we are looking at a single file or a direcotry of files')
     parser.add_argument('--teloNP', action='store_true', help='Flag to indicate whether to use teloNP')
-    parser.add_argument('--chemistry', choices=['R10', 'R9'], default='R10', help='Nanopore chemistry for the teloNP settings: R10 (default) or R9 for Guppy-basecalled R9.4.1 reads')
+    parser.add_argument('--chemistry', choices=['R10', 'R9', 'R9_archive'], default='R10', help='Nanopore chemistry for the teloNP settings: R10 (default), R9 for Guppy-basecalled R9.4.1 reads, or R9_archive to reproduce TeloNP v1 results')
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
     parser.add_argument('--save_graphs', action='store_true', help='Flag to indicate whether to save graphs')
     parser.add_argument('--targetQnamesCSV', type=str, help='Path to an input csv that has the qnammes we want to test')  # Optional argument for input file
