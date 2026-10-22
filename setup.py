@@ -16,7 +16,6 @@ setup(
         'numpy',
         'pandas',
         'pyparsing',
-        'pandarallel',
         'zipp'
     ],
     # install_requires=[

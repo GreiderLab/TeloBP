@@ -1,6 +1,6 @@
 # This script is used to run the teloBP analysis on a set of fastq files.
 # The script can be run from the command line using the following command:
-# python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9|R9_archive] [-v]
+# python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9|R9_archive] [--workers N] [-v]
 # The script takes the following arguments:
 # dataDir: The path to the data directory containing the fastq files to be analyzed. 
 #          OR the path to a single fastq file to be analyzed. set the --fileMode flag to indicate this.
@@ -12,6 +12,7 @@
 # --targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
 # --save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
 # The program will run in single threaded mode when --save_graphs is set to True.
+# --workers: The number of worker processes the reads are analyzed with. Defaults to all CPUs.
 # -v: Flag to enable verbose output.
 
 
@@ -20,28 +21,35 @@ from Bio import SeqIO
 import gzip
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
-from pandarallel import pandarallel
 import sys
 import argparse
 import json
 import platform
 import subprocess
+import time
+from functools import partial
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 import Bio
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import TeloBP as teloBPPackage
 
-# sys.path.insert(0, '../TeloBP')
 from TeloBP import *
 # from constants import errorReturns
 errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20, "seqNotFound": -1000}
 
+# Note: with the spawn start method (Windows, macOS) every worker process imports this script again,
+# so module level code must not have side effects like creating files.
 teloNP = False
 chemistryGlobal = "R10"
-pdf = PdfPages('teloGraphs.pdf')
+# The graphs pdf is only opened by run_analysis when graphs are saved, which always runs in a single process
+pdf = None
 showGraphsGlobal = False
 outputColName = "teloBPLengths"
+workersGlobal = 1
+# Seconds between "processed X/Y reads" progress lines
+progressInterval = 5
 
 verbose = False
 
@@ -64,12 +72,9 @@ def vprint(*args, **kwargs):
 #         teloLength = getTeloBoundary(row["seq"])
 #     return teloLength
 
+# rowToTeloBP and rowToTeloNP run in the worker processes, so they have to stay top level functions that can be pickled.
+# row is a dict with "qname" and "seq".
 def rowToTeloBP(row, sampleKey, showGraphsGlobal):
-    import sys
-    sys.path.insert(0, '../TeloBP')
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from TeloBP import getTeloBoundary
     if row["seq"] is np.nan:
         return errorReturns["seqNotFound"]
     teloLength = -1
@@ -86,11 +91,6 @@ def rowToTeloBP(row, sampleKey, showGraphsGlobal):
     return teloLength
 
 def rowToTeloNP(row, sampleKey, showGraphsGlobal, chemistry):
-    import sys
-    sys.path.insert(0, '../TeloBP')
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from TeloBP import getTeloNPBoundary
     if row["seq"] is np.nan:
         return errorReturns["seqNotFound"]
     teloLength = -1
@@ -105,7 +105,33 @@ def rowToTeloNP(row, sampleKey, showGraphsGlobal, chemistry):
     teloLength = getTeloNPBoundary(row["seq"],showGraphs = showGraphsGlobal, pdf = pdfLocal, chemistry = chemistry)
     return teloLength
 
-def process_sampleDf(sampleQnames, sampleKey, outputDir):
+def getDefaultWorkers():
+    # All the CPUs this process may use. On Linux this respects CPU limits set by e.g. SLURM or taskset.
+    if hasattr(os, "sched_getaffinity"):
+        cpus = len(os.sched_getaffinity(0))
+    else:
+        cpus = os.cpu_count() or 1
+    # Windows supports at most 61 worker processes
+    if sys.platform == "win32":
+        cpus = min(cpus, 61)
+    return cpus
+
+def getChunksize(numReads, workers):
+    # Reads are sent to the workers in chunks, so thousands of short reads aren't slowed down by per-read overhead.
+    # Chunks are kept small (about 8 per worker, at most 50 reads) so that the workers finish at about the same time.
+    return max(1, min(50, numReads // (workers * 8)))
+
+def printProgress(teloLengths, total, sampleKey):
+    # Passes the results through, printing "processed X/Y reads" every progressInterval seconds and once at the end
+    lastPrint = time.monotonic()
+    for count, teloLength in enumerate(teloLengths, 1):
+        yield teloLength
+        if count == total or time.monotonic() - lastPrint >= progressInterval:
+            print(f"{sampleKey}: processed {count}/{total} reads", flush=True)
+            lastPrint = time.monotonic()
+
+def process_sampleDf(sampleQnames, sampleKey, outputDir, executor=None):
+    # executor is the pool of worker processes. When it is None the reads are analyzed in this process.
     sampleDf = sampleQnames[sampleKey]
     inputLen = len(sampleDf)
     
@@ -113,16 +139,22 @@ def process_sampleDf(sampleQnames, sampleKey, outputDir):
     currentPath = os.path.dirname(os.path.realpath(__file__))
     vprint(f"Current path: {currentPath}")
 
-    
-    if not showGraphsGlobal:
-        pandarallel.initialize(progress_bar=True)
     if teloNP:
-        if showGraphsGlobal:
-            sampleDf[outputColName] = sampleDf.apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal, chemistryGlobal))
-        else:
-            sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal, chemistryGlobal))
+        rowFunction = partial(rowToTeloNP, sampleKey=sampleKey, showGraphsGlobal=showGraphsGlobal, chemistry=chemistryGlobal)
     else:
-        sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloBP,axis=1, args=(sampleKey, showGraphsGlobal))
+        rowFunction = partial(rowToTeloBP, sampleKey=sampleKey, showGraphsGlobal=showGraphsGlobal)
+    # Plain dicts are much cheaper to send to the worker processes than pandas rows
+    rows = sampleDf.to_dict("records")
+
+    if executor is None:
+        print(f"Analyzing {inputLen} reads from {sampleKey} in a single process", flush=True)
+        # Graphs are always drawn here, so they all go into the one pdf
+        teloLengths = map(rowFunction, rows)
+    else:
+        print(f"Analyzing {inputLen} reads from {sampleKey} with {workersGlobal} worker processes", flush=True)
+        # map returns the results in the same order as the reads
+        teloLengths = executor.map(rowFunction, rows, chunksize=getChunksize(inputLen, workersGlobal))
+    sampleDf[outputColName] = list(printProgress(teloLengths, inputLen, sampleKey))
 
     vprint(f"inputLen: {inputLen}")
     vprint(f"outputLen: {len(sampleDf)}")
@@ -161,6 +193,8 @@ def writeRunMetadata(outputDir, filenames, sampleQnames):
         "command": " ".join(sys.argv),
         "method": "TeloNP" if teloNP else "TeloBP",
         "settings": getTeloNPSettings(chemistryGlobal) if teloNP else getTeloBPSettings(),
+        # Number of processes the reads were analyzed with (1 when graphs were saved). It doesn't change the results.
+        "workers": workersGlobal,
         "inputFiles": filenames,
         "readsPerSample": {sampleKey: len(sampleDf) for sampleKey, sampleDf in sampleQnames.items()},
         "python": platform.python_version(),
@@ -173,15 +207,16 @@ def writeRunMetadata(outputDir, filenames, sampleQnames):
 
 def saveDfNoNeg(df, outputColName, outputDir, sampleKey):
     dfNoNeg = df[df[outputColName] > 0]
-    dfNoNeg.reset_index(drop=True, inplace=True)
+    dfNoNeg = dfNoNeg.reset_index(drop=True)
     # create outdir if it doesn't exist
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
     dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv")
 
 # def run_analysis(dataDir, fileMode, teloNP, outputDir, progressLabel, output_frame):
-def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targetQnamesCSV=None, chemistry="R10"):
-    global teloNP, chemistryGlobal
+def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targetQnamesCSV=None, chemistry="R10", workers=None):
+    # workers: number of worker processes, None for all CPUs
+    global teloNP, chemistryGlobal, workersGlobal, pdf
     teloNP = teloNPIn
     chemistryGlobal = chemistry
     if teloNP:
@@ -200,6 +235,17 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
         global showGraphsGlobal
         showGraphsGlobal = True
     
+    if workers is None:
+        workers = getDefaultWorkers()
+    if workers < 1:
+        raise ValueError(f"workers must be at least 1, got {workers}")
+    if showGraphsGlobal:
+        # Every graph goes into one pdf, so the reads are analyzed in this process only
+        pdf = PdfPages('teloGraphs.pdf')
+        workers = 1
+    workersGlobal = workers
+    vprint(f"Worker processes: {workersGlobal}")
+
     targetQnames = None
     if targetQnamesCSV is not None:
         targetQnames = pd.read_csv(targetQnamesCSV, header=None)
@@ -221,82 +267,64 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
     
     totalFiles = len(filenames)
     count = 0
-    for filename in filenames:
-        if not filename.endswith(".gz") and not filename.endswith(".fastq"):
-            continue
+    # The worker processes are started once and reused for every file
+    executor = None
+    if workersGlobal > 1:
+        executor = ProcessPoolExecutor(max_workers=workersGlobal)
+    try:
+        for filename in filenames:
+            if not filename.endswith(".gz") and not filename.endswith(".fastq"):
+                continue
 
-        sampleKey = "_".join(filename.split("/")[-1].split("\\")[-1].split(".")[:-1]).replace(" ", "_")
-        vprint(f"sampling key: {sampleKey}")
+            sampleKey = "_".join(filename.split("/")[-1].split("\\")[-1].split(".")[:-1]).replace(" ", "_")
+            vprint(f"sampling key: {sampleKey}")
 
-        qnameTeloValues = []
-        #file = os.path.join(root, filename)
-        file = filename
-        vprint(file)
-        if filename.endswith("fastq.gz"):
-            with gzip.open(file,"rt") as handle:
-                records = SeqIO.parse(handle,"fastq")
-                for record in records:
-                    if targetQnames is not None and record.id not in targetQnames:
-                        continue
-                    print(record.id)
-                    qnameTeloValues.append([record.id, record.seq])
-        elif filename.endswith("fastq"):
-            try:
-                for record in SeqIO.parse(file,"fastq"):
-                    if targetQnames is not None and record.id not in targetQnames:
-                        continue
-                    print(record.id)
-                    qnameTeloValues.append([record.id, record.seq])
-            except Exception as e:
-                print(f"Error while reading file: {file}")
-                print(e)
-        else: 
-            continue
+            qnameTeloValues = []
+            #file = os.path.join(root, filename)
+            file = filename
+            vprint(file)
+            if filename.endswith("fastq.gz"):
+                with gzip.open(file,"rt") as handle:
+                    records = SeqIO.parse(handle,"fastq")
+                    for record in records:
+                        if targetQnames is not None and record.id not in targetQnames:
+                            continue
+                        print(record.id)
+                        qnameTeloValues.append([record.id, record.seq])
+            elif filename.endswith("fastq"):
+                try:
+                    for record in SeqIO.parse(file,"fastq"):
+                        if targetQnames is not None and record.id not in targetQnames:
+                            continue
+                        print(record.id)
+                        qnameTeloValues.append([record.id, record.seq])
+                except Exception as e:
+                    print(f"Error while reading file: {file}")
+                    print(e)
+            else: 
+                continue
 
-        qnameTeloValuesDf = pd.DataFrame(qnameTeloValues, columns = ["qname", "seq"])
+            qnameTeloValuesDf = pd.DataFrame(qnameTeloValues, columns = ["qname", "seq"])
 
-        if len(qnameTeloValuesDf) == 0:
-            vprint(f"No records in file: {file}")
-            continue
+            if len(qnameTeloValuesDf) == 0:
+                vprint(f"No records in file: {file}")
+                continue
 
-        #sampleQnames[sampleKey] = pd.merge(sampleDf, qnameTeloValuesDf, on='qname', how='left')
-        sampleQnames[sampleKey] = qnameTeloValuesDf
+            #sampleQnames[sampleKey] = pd.merge(sampleDf, qnameTeloValuesDf, on='qname', how='left')
+            sampleQnames[sampleKey] = qnameTeloValuesDf
 
-        sampleQnames[sampleKey] = process_sampleDf(sampleQnames, sampleKey, outputDir)
+            sampleQnames[sampleKey] = process_sampleDf(sampleQnames, sampleKey, outputDir, executor)
 
-        count += 1
+            count += 1
         
-        # progressLabel.config(text=f"Loading fastq files... ({count}/{totalFiles})")
-
-    # The following code does not work at the moment. 
-    # else:
-    #     vprint("RUNNING MULTI-PROCESSING")
-    #     count = 0
-    #     def process_table(sampleKey):
-    #         sampleDf = sampleQnames[sampleKey]
-            
-    #         # Apply the function to each row
-    #         sampleDf[outputColName] = sampleDf.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
-
-    #         # Note that the seq column is removed from the table before saving 
-    #         sampleDf = sampleDf.drop(columns=["seq"])
-    #         sampleQnames[sampleKey] = sampleDf
-
-    #         # Save the output to a csv file. 
-    #         saveDfNoNeg(sampleDf, outputColName, outputDir, sampleKey)
-    #         nonlocal count
-    #         count += 1
-    #         # progressLabel.config(text=f"Processing tables... ({count}/{totalFiles})")
-
-    #     vprint(f"******************** Multiprocessing {len(sampleQnames.keys())} tables ********************")
-    #     vprint(f"Number of CPUs: {mp.cpu_count()}")
-
-    #     # Create a pool of processes
-    #     with mp.Pool(mp.cpu_count()) as pool:
-    #         pool.map(process_table, sampleQnames.keys())
+            # progressLabel.config(text=f"Loading fastq files... ({count}/{totalFiles})")
+    finally:
+        if executor is not None:
+            executor.shutdown(cancel_futures=True)
 
     # Save pdf
-    pdf.close()
+    if pdf is not None:
+        pdf.close()
 
     writeRunMetadata(outputDir, filenames, sampleQnames)
 
@@ -387,13 +415,16 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
     parser.add_argument('--save_graphs', action='store_true', help='Flag to indicate whether to save graphs')
     parser.add_argument('--targetQnamesCSV', type=str, help='Path to an input csv that has the qnammes we want to test')  # Optional argument for input file
-    
+    parser.add_argument('--workers', type=int, default=None, help='Number of worker processes to analyze the reads with (default: all CPUs). Graphs are always made in a single process.')
+
     # parser.add_argument('--progressLabel', type=str, help='Progress label')
 
     # Parse the command line arguments
     args = parser.parse_args()
     verbose = args.verbose
+    if args.workers is not None and args.workers < 1:
+        parser.error("--workers must be at least 1")
 
     # Call the run_analysis function with the parsed arguments
-    run_analysis(args.dataDir, args.fileMode, args.teloNP, args.outputDir, save_graphs=args.save_graphs, targetQnamesCSV=args.targetQnamesCSV, chemistry=args.chemistry)
+    run_analysis(args.dataDir, args.fileMode, args.teloNP, args.outputDir, save_graphs=args.save_graphs, targetQnamesCSV=args.targetQnamesCSV, chemistry=args.chemistry, workers=args.workers)
     # run_analysis("../data", False, True, "../output", None, None)

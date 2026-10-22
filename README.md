@@ -23,7 +23,6 @@ Biopython
 matplotlib
 pandas
 numpy
-pandarallel
 ```
 
 While TeloBP was developed in Python 3.10, the packages in the requirements.txt file should work with versions up to Python 3.12.
@@ -36,7 +35,7 @@ In the Scripts directory, the teloBPCmd.py script runs the teloBP analysis on a 
 The script can be run from the command line using the following command:
 
 ```
-python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9|R9_archive] [-v] [--targetQnamesCSV <csv file>] [--save_graphs]
+python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9|R9_archive] [--workers N] [-v] [--targetQnamesCSV <csv file>] [--save_graphs]
 ```
 
 The script takes the following arguments:
@@ -50,11 +49,12 @@ More details on the difference between TeloBP and TeloNP can be found below.
 --targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
 --save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
 The program will run in single threaded mode when --save_graphs is set to True.
+--workers: The number of worker processes the reads are analyzed with, in parallel. Defaults to all the CPUs available. The results are the same for any number of workers. Use a smaller number to leave CPUs free for other work, or 1 to run in a single process.
 -v: Flag to enable verbose output.
 
 The script will output a .csv file containing read qnames and telomere length values for all the reads which passed basic filtering.
 
-It also writes `teloBP_run_metadata.json` to the output directory, recording what produced the results: the TeloBP version and git commit, the full TeloBP or TeloNP settings used, the command, the input files, the number of reads per sample, and the Python and package versions. Keep it with the results so they can be reproduced. When calling the functions directly, `getTeloNPSettings(chemistry)` and `getTeloBPSettings()` return the same settings for your own records.
+It also writes `teloBP_run_metadata.json` to the output directory, recording what produced the results: the TeloBP version and git commit, the full TeloBP or TeloNP settings used, the number of worker processes, the command, the input files, the number of reads per sample, and the Python and package versions. Keep it with the results so they can be reproduced. When calling the functions directly, `getTeloNPSettings(chemistry)` and `getTeloBPSettings()` return the same settings for your own records.
 
 ### Genome Trimming
 
