@@ -1,12 +1,13 @@
 # This script is used to run the teloBP analysis on a set of fastq files.
 # The script can be run from the command line using the following command:
-# python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [-v]
+# python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9] [-v]
 # The script takes the following arguments:
 # dataDir: The path to the data directory containing the fastq files to be analyzed. 
 #          OR the path to a single fastq file to be analyzed. set the --fileMode flag to indicate this.
 # outputDir: The path to the output directory where the results will be saved.
 # --fileMode: Flag indicating that a single file is being analyzed.
 # --teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis.
+# --chemistry: The nanopore chemistry TeloNP settings are chosen for. R10 (default) or R9 for Guppy-basecalled R9.4.1 reads.
 # --targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
 # --save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
 # The program will run in single threaded mode when --save_graphs is set to True.
@@ -30,6 +31,7 @@ from TeloBP import *
 errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20, "seqNotFound": -1000}
 
 teloNP = False
+chemistryGlobal = "R10"
 pdf = PdfPages('teloGraphs.pdf')
 showGraphsGlobal = False
 outputColName = "teloBPLengths"
@@ -76,7 +78,7 @@ def rowToTeloBP(row, sampleKey, showGraphsGlobal):
     teloLength = getTeloBoundary(row["seq"], showGraphs = showGraphsGlobal, pdf = pdfLocal)
     return teloLength
 
-def rowToTeloNP(row, sampleKey, showGraphsGlobal):
+def rowToTeloNP(row, sampleKey, showGraphsGlobal, chemistry):
     import sys
     sys.path.insert(0, '../TeloBP')
     import numpy as np
@@ -93,7 +95,7 @@ def rowToTeloNP(row, sampleKey, showGraphsGlobal):
         plt.axis('off')
         pdf.savefig()  # Save the text figure
         pdfLocal = pdf
-    teloLength = getTeloNPBoundary(row["seq"],showGraphs = showGraphsGlobal, pdf = pdfLocal)
+    teloLength = getTeloNPBoundary(row["seq"],showGraphs = showGraphsGlobal, pdf = pdfLocal, chemistry = chemistry)
     return teloLength
 
 def process_sampleDf(sampleQnames, sampleKey, outputDir):
@@ -109,9 +111,9 @@ def process_sampleDf(sampleQnames, sampleKey, outputDir):
         pandarallel.initialize(progress_bar=True)
     if teloNP:
         if showGraphsGlobal:
-            sampleDf[outputColName] = sampleDf.apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal))
+            sampleDf[outputColName] = sampleDf.apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal, chemistryGlobal))
         else:
-            sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal))
+            sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal, chemistryGlobal))
     else:
         sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloBP,axis=1, args=(sampleKey, showGraphsGlobal))
 
@@ -141,16 +143,17 @@ def saveDfNoNeg(df, outputColName, outputDir, sampleKey):
     dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv")
 
 # def run_analysis(dataDir, fileMode, teloNP, outputDir, progressLabel, output_frame):
-def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targetQnamesCSV=None):
-    global teloNP 
+def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targetQnamesCSV=None, chemistry="R10"):
+    global teloNP, chemistryGlobal
     teloNP = teloNPIn
+    chemistryGlobal = chemistry
     if teloNP:
         global outputColName
         outputColName = "teloNPLengths"
     vprint(f'Running analysis on {dataDir}')
     # Process the selected file or folder
     vprint(f"Data type: {'File mode' if fileMode else 'Folder mode'}")
-    print(f"Use teloNP: {teloNP}")
+    print(f"Use teloNP: {teloNP}" + (f" ({chemistryGlobal} settings)" if teloNP else ""))
     vprint("Beginnging data loading")
 
     if targetQnamesCSV is None and save_graphs:
@@ -341,6 +344,7 @@ if __name__ == "__main__":
     parser.add_argument('outputDir', type=str, help='Path to the output directory')
     parser.add_argument('--fileMode', action='store_true', help='Flag to indicate if we are looking at a single file or a direcotry of files')
     parser.add_argument('--teloNP', action='store_true', help='Flag to indicate whether to use teloNP')
+    parser.add_argument('--chemistry', choices=['R10', 'R9'], default='R10', help='Nanopore chemistry for the teloNP settings: R10 (default) or R9 for Guppy-basecalled R9.4.1 reads')
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
     parser.add_argument('--save_graphs', action='store_true', help='Flag to indicate whether to save graphs')
     parser.add_argument('--targetQnamesCSV', type=str, help='Path to an input csv that has the qnammes we want to test')  # Optional argument for input file
@@ -352,5 +356,5 @@ if __name__ == "__main__":
     verbose = args.verbose
 
     # Call the run_analysis function with the parsed arguments
-    run_analysis(args.dataDir, args.fileMode, args.teloNP, args.outputDir, save_graphs=args.save_graphs, targetQnamesCSV=args.targetQnamesCSV)
+    run_analysis(args.dataDir, args.fileMode, args.teloNP, args.outputDir, save_graphs=args.save_graphs, targetQnamesCSV=args.targetQnamesCSV, chemistry=args.chemistry)
     # run_analysis("../data", False, True, "../output", None, None)

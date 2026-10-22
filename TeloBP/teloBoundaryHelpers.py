@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 
-from TeloBP.constants import manualLabelsCHM13Positions, manualLabelsCHM13
+from TeloBP.constants import manualLabelsCHM13Positions, manualLabelsCHM13, areaDiffsThreshold
 import warnings
 
 
@@ -49,6 +49,33 @@ def getGraphArea(offsets, targetColumn, windowSize):
         areaList.append((area / windowSize))
         # areaList.append(area)
     return areaList
+
+
+def getPlateauIndex(areaDiffs, startIndex):
+    # Look through areaDiffs to find point where areaDiffs plateau. Returns -1 if they never do.
+    for x in range(startIndex, len(areaDiffs)-1):
+        # if it plateaus, or in the rare case that the diff jumps over the threshold, we have found the boundary point
+        if abs(areaDiffs[x]) < areaDiffsThreshold or areaDiffs[x] < areaDiffsThreshold and areaDiffs[x+1] > areaDiffsThreshold :
+            return x
+    return -1
+
+
+def stepOverShortGaps(areaList, areaDiffs, plateauIndex, maxGapSteps, changeThreshold, plateauDetectionThreshold):
+    # If the area climbs back above changeThreshold within maxGapSteps of the boundary, the dip was a gap
+    # inside the telomere (e.g. a stretch of bad basecalls), so we look for the next discontinuity instead.
+    # Telomeric sequence further away than that, like an ITS, is left out of the telomere.
+    while plateauIndex != -1:
+        resumeIndex = next((y for y in range(plateauIndex, min(len(areaList), plateauIndex + maxGapSteps))
+                            if areaList[y] > changeThreshold), -1)
+        if resumeIndex == -1:
+            return plateauIndex
+        nextIndex = next((y for y in range(resumeIndex, len(areaList) - 2) if (
+            areaList[y] < plateauDetectionThreshold and (0 > (areaList[y + 1] - areaList[y])))), -1)
+        if nextIndex == -1:
+            # The telomere continues to the end of the sequence
+            return -1
+        plateauIndex = getPlateauIndex(areaDiffs, nextIndex)
+    return plateauIndex
 
 
 def graphLine(rowIn, labelIn, windowStep, boundaryPoint=-1, pdfOut=None):

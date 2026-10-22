@@ -1,5 +1,5 @@
 from TeloBP.teloBoundaryHelpers import *
-from TeloBP.constants import expectedTeloCompositionQ, expectedTeloCompositionP, areaDiffsThreshold, teloNPTeloCompositionGStrand, teloNPTeloCompositionCStrand, errorReturns
+from TeloBP.constants import expectedTeloCompositionQ, expectedTeloCompositionP, areaDiffsThreshold, teloNPTeloCompositionGStrand, teloNPTeloCompositionCStrand, errorReturns, teloNPPresets
 import numpy as np
 from Bio import SeqIO
 import re
@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.ERROR)
 #logging.basicConfig(level=logging.WARNING)
 
 # The following function takes in a sequence, and returns the index of the telomere boundary.
-def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCStrand = [], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, pdf=None, returnLastDiscontinuity=False, secondarySearch = False):
+def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCStrand = [], teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-50, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=500, showGraphs=False, pdf=None, returnLastDiscontinuity=False, secondarySearch = False, maxDiscontinuityGap = 0):
     """
     This function takes in a sequence, and returns the index of the telomere boundary.
 
@@ -37,6 +37,9 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
     :param pdf: A pdf object, if provided, the graphs will be saved to the pdf.
     :param returnLastDiscontinuity: Boolean value, if true, the algorithm will return the last possible point of discontinuity, rather than the first.
            For sequences which are very noisy, this may be necessary, as the first point of discontinuity may be a false positive.
+           Note that this has no limit on distance, so in long reads an interstitial telomeric sequence (ITS) far from the telomere can be returned.
+    :param maxDiscontinuityGap: Only used when returnLastDiscontinuity is false. If greater than 0, a discontinuity is stepped over when
+           telomere-like sequence resumes within this many bp of it, for example a stretch of bad basecalls inside the telomere.
     """
 
     boundaryPoint = -1
@@ -166,12 +169,11 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
             #                offsetIndexToBPConstant=windowStep)
         return errorReturns['init']
 
-    # Look through areaDiffs to find point where areaDiffs plateau
-    for x in range(indexAtThreshold, len(areaDiffs)-1):
-        # if it plateaus, or in the rare case that the diff jumps over the threshold, we have found the boundary point
-        if abs(areaDiffs[x]) < areaDiffsThreshold or areaDiffs[x] < areaDiffsThreshold and areaDiffs[x+1] > areaDiffsThreshold :
-            boundaryPoint = x * windowStep
-            break
+    plateauIndex = getPlateauIndex(areaDiffs, indexAtThreshold)
+    if maxDiscontinuityGap > 0 and not returnLastDiscontinuity:
+        plateauIndex = stepOverShortGaps(areaList, areaDiffs, plateauIndex, int(maxDiscontinuityGap / windowStep), changeThreshold, plateauDetectionThreshold)
+    if plateauIndex != -1:
+        boundaryPoint = plateauIndex * windowStep
     if boundaryPoint == -1:
         # This means we have reached the end of the telomere
         # but we didn't fine the point at which the telomere offset stopped changing.
@@ -370,5 +372,20 @@ def isGStrand(chrArm,strand):
     
 
 
-def getTeloNPBoundary(seq, isGStrand=None, compositionCStrandIn=teloNPTeloCompositionCStrand, compositionGStrandIn=teloNPTeloCompositionGStrand, teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=750, showGraphs=False, pdf=None, returnLastDiscontinuity=True, secondarySearch = True):
-    return getTeloBoundary(seq, isGStrand, compositionCStrand=compositionCStrandIn, compositionGStrand=compositionGStrandIn, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, pdf=pdf, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch)
+# chemistry selects the preset from teloNPPresets: "R10" (default) or "R9" for Guppy-basecalled R9.4.1 reads.
+# Any argument left as None takes the preset's value.
+def getTeloNPBoundary(seq, isGStrand=None, compositionCStrandIn=None, compositionGStrandIn=None, teloWindow=100, windowStep=6, changeThreshold=-20, plateauDetectionThreshold=-60, targetPatternIndex=-1, nucleotideGraphAreaWindowSize=None, showGraphs=False, pdf=None, returnLastDiscontinuity=None, secondarySearch = True, chemistry="R10", maxDiscontinuityGap=None):
+    if chemistry not in teloNPPresets:
+        raise ValueError(f"chemistry should be one of {list(teloNPPresets.keys())}, got {chemistry}")
+    preset = teloNPPresets[chemistry]
+    if compositionCStrandIn is None:
+        compositionCStrandIn = preset["compositionCStrand"]
+    if compositionGStrandIn is None:
+        compositionGStrandIn = preset["compositionGStrand"]
+    if nucleotideGraphAreaWindowSize is None:
+        nucleotideGraphAreaWindowSize = preset["nucleotideGraphAreaWindowSize"]
+    if returnLastDiscontinuity is None:
+        returnLastDiscontinuity = preset["returnLastDiscontinuity"]
+    if maxDiscontinuityGap is None:
+        maxDiscontinuityGap = preset["maxDiscontinuityGap"]
+    return getTeloBoundary(seq, isGStrand, compositionCStrand=compositionCStrandIn, compositionGStrand=compositionGStrandIn, teloWindow=teloWindow, windowStep=windowStep, changeThreshold=changeThreshold, plateauDetectionThreshold=plateauDetectionThreshold, targetPatternIndex=targetPatternIndex, nucleotideGraphAreaWindowSize=nucleotideGraphAreaWindowSize, showGraphs=showGraphs, pdf=pdf, returnLastDiscontinuity=returnLastDiscontinuity, secondarySearch=secondarySearch, maxDiscontinuityGap=maxDiscontinuityGap)

@@ -36,7 +36,7 @@ In the Scripts directory, the teloBPCmd.py script runs the teloBP analysis on a 
 The script can be run from the command line using the following command:
 
 ```
-python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [-v] [--targetQnamesCSV <csv file>] [--save_graphs]
+python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9] [-v] [--targetQnamesCSV <csv file>] [--save_graphs]
 ```
 
 The script takes the following arguments:
@@ -46,6 +46,7 @@ outputDir: The path to the output directory where the results will be saved.
 --fileMode: Flag indicating that a single file is being analyzed.
 --teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis.
 More details on the difference between TeloBP and TeloNP can be found below.
+--chemistry: The nanopore chemistry the TeloNP settings are chosen for: R10 (default) or R9 for reads basecalled with Guppy on R9.4.1 flow cells. Only used with --teloNP.
 --targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
 --save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
 The program will run in single threaded mode when --save_graphs is set to True.
@@ -96,14 +97,18 @@ When using regular expressions for the patterns, a third argument is required, s
 
 ### TeloNP: TeloBP for Nanopore Reads
 
-TeloNP uses the same TeloBP algorithm, but is pre-optimized for nanopore reads basecalled with guppy.
+TeloNP uses the same TeloBP algorithm, with settings preset for nanopore reads. There are two presets, chosen with the `chemistry` argument:
 
-The current parameters are optimized to account for misscalls in Guppy basecalling.
+- **R10** (default): for R10.4.1 reads, usually basecalled with Dorado. It counts the canonical repeat and every 1 bp substitution of it, and returns the first discontinuity in the telomere pattern. A discontinuity is stepped over only when telomere sequence resumes within 2 kb of it (`maxDiscontinuityGap`), which covers short stretches of bad basecalls inside a telomere.
+- **R9**: the original TeloNP settings, for R9.4.1 reads basecalled with Guppy. Its patterns accept Guppy's telomere miscalls, and it returns the last discontinuity in the read to step over gaps in noisy reads. In long reads this can count an interstitial telomeric sequence (ITS) far from the telomere as part of the telomere, so check unusually long calls.
+
+Results from versions before the R10 preset were made with what is now the R9 preset. To reproduce them, pass `chemistry="R9"`.
 
 #### TeloNP recommended usage
 
 ```
-getTeloNPBoundary(seq)
+getTeloNPBoundary(seq)                   # R10 reads
+getTeloNPBoundary(seq, chemistry="R9")   # Guppy-basecalled R9.4.1 reads
 ```
 
 Where seq is the sequence to be analyzed.
