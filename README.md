@@ -54,7 +54,7 @@ The program will run in single threaded mode when --save_graphs is set to True.
 
 The script will output a .csv file containing read qnames and telomere length values for all the reads which passed basic filtering.
 
-It also writes `teloBP_run_metadata.json` to the output directory, recording what produced the results: the TeloBP version and git commit, the full TeloBP or TeloNP settings used, the number of worker processes, the command, the input files, the number of reads per sample, and the Python and package versions. Keep it with the results so they can be reproduced. When calling the functions directly, `getTeloNPSettings(chemistry)` and `getTeloBPSettings()` return the same settings for your own records.
+It also writes `teloBP_run_metadata.json` to the output directory, recording what produced the results: the TeloBP version, the full TeloBP or TeloNP settings used, the number of worker processes, the command, the input files, the number of reads per sample, and the Python and package versions. Keep it with the results so they can be reproduced. When calling the functions directly, `getTeloNPSettings(chemistry)` and `getTeloBPSettings()` return the same settings for your own records.
 
 ### Genome Trimming
 

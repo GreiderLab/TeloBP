@@ -25,7 +25,6 @@ import sys
 import argparse
 import json
 import platform
-import subprocess
 import time
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
@@ -173,22 +172,10 @@ def process_data(df):
     df[outputColName] = df.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
     return df
 
-def getGitCommit():
-    # The commit of the TeloBP checkout being run, with "-dirty" if it has uncommitted changes.
-    # None when TeloBP wasn't installed from a git checkout.
-    packageDir = os.path.dirname(os.path.realpath(teloBPPackage.__file__))
-    try:
-        commit = subprocess.run(["git", "-C", packageDir, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-        dirty = subprocess.run(["git", "-C", packageDir, "status", "--porcelain", "--untracked-files=no"], capture_output=True, text=True, check=True).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return commit + ("-dirty" if dirty else "")
-
 def writeRunMetadata(outputDir, filenames, sampleQnames):
     # Saves the version and settings of this run next to its results, so they can be reproduced
     metadata = {
         "teloBPVersion": teloBPPackage.__version__,
-        "gitCommit": getGitCommit(),
         "runAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "command": " ".join(sys.argv),
         "method": "TeloNP" if teloNP else "TeloBP",
