@@ -102,7 +102,7 @@ When using regular expressions for the patterns, a third argument is required, s
 TeloNP uses the same TeloBP algorithm, with settings preset for nanopore reads. There are three presets, chosen with the `chemistry` argument:
 
 - **R10** (default): for R10.4.1 reads, usually basecalled with Dorado. It counts the canonical repeat and every 1 bp substitution of it, and returns the first discontinuity in the telomere pattern. A discontinuity is stepped over only when telomere sequence resumes within 2 kb of it (`maxDiscontinuityGap`), which covers short stretches of bad basecalls inside a telomere without counting an interstitial telomeric sequence (ITS) further away.
-- **R9**: for R9.4.1 reads basecalled with Guppy. Its patterns accept Guppy's telomere miscalls, with the same 2 kb gap limit as R10. It has so far been checked on a small set of R9 reads only, so compare it with R9_archive on your own data before relying on it.
+- **R9**: for R9.4.1 reads basecalled with Guppy. Its patterns accept everything R10 does plus Guppy's telomere miscalls, with the same 2 kb gap limit as R10. Compare it with R9_archive on your own data before relying on it.
 - **R9_archive**: the original TeloNP settings from v1, kept unchanged so earlier results can be reproduced. It returns the last discontinuity in the read to step over gaps in noisy reads, which in long reads can count an ITS far from the telomere as part of the telomere.
 
 To reproduce results made before these presets existed, pass `chemistry="R9_archive"`.
