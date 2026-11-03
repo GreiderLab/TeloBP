@@ -23,7 +23,6 @@ Biopython
 matplotlib
 pandas
 numpy
-pandarallel
 ```
 
 While TeloBP was developed in Python 3.10, the packages in the requirements.txt file should work with versions up to Python 3.12.
@@ -36,7 +35,7 @@ In the Scripts directory, the teloBPCmd.py script runs the teloBP analysis on a 
 The script can be run from the command line using the following command:
 
 ```
-python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [-v] [--targetQnamesCSV <csv file>] [--save_graphs]
+python3 teloBPCmd.py <dataDir> <outputDir> [--fileMode] [--teloNP] [--chemistry R10|R9|R9_archive] [--workers N] [-v] [--targetQnamesCSV <csv file>] [--save_graphs]
 ```
 
 The script takes the following arguments:
@@ -46,12 +45,16 @@ outputDir: The path to the output directory where the results will be saved.
 --fileMode: Flag indicating that a single file is being analyzed.
 --teloNP: Flag indicating that the teloNP analysis should be run instead of the teloBP analysis.
 More details on the difference between TeloBP and TeloNP can be found below.
+--chemistry: The nanopore chemistry the TeloNP settings are chosen for: R10 (default), R9 for reads basecalled with Guppy on R9.4.1 flow cells, or R9_archive to reproduce results from TeloNP v1. Only used with --teloNP. See "TeloNP: TeloBP for Nanopore Reads" below.
 --targetQnamesCSV: Path to a csv file containing the qnames of the reads to be analyzed. The analysis will only be run on these reads.
 --save_graphs: Flag indicating to generate graphs during analysis and save them to a pdf file. They will be saved in the main directory.
 The program will run in single threaded mode when --save_graphs is set to True.
+--workers: The number of worker processes the reads are analyzed with, in parallel. Defaults to all the CPUs available. The results are the same for any number of workers. Use a smaller number to leave CPUs free for other work, or 1 to run in a single process.
 -v: Flag to enable verbose output.
 
 The script will output a .csv file containing read qnames and telomere length values for all the reads which passed basic filtering.
+
+It also writes `teloBP_run_metadata.json` to the output directory, recording what produced the results: the TeloBP version, the full TeloBP or TeloNP settings used, the number of worker processes, the command, the input files, the number of reads per sample, and the Python and package versions. Keep it with the results so they can be reproduced. When calling the functions directly, `getTeloNPSettings(chemistry)` and `getTeloBPSettings()` return the same settings for your own records.
 
 ### Genome Trimming
 
@@ -96,14 +99,20 @@ When using regular expressions for the patterns, a third argument is required, s
 
 ### TeloNP: TeloBP for Nanopore Reads
 
-TeloNP uses the same TeloBP algorithm, but is pre-optimized for nanopore reads basecalled with guppy.
+TeloNP uses the same TeloBP algorithm, with settings preset for nanopore reads. There are three presets, chosen with the `chemistry` argument:
 
-The current parameters are optimized to account for misscalls in Guppy basecalling.
+- **R10** (default): for R10.4.1 reads, usually basecalled with Dorado. It counts the canonical repeat and every 1 bp substitution of it, and returns the first discontinuity in the telomere pattern. A discontinuity is stepped over only when telomere sequence resumes within 2 kb of it (`maxDiscontinuityGap`), which covers short stretches of bad basecalls inside a telomere without counting an interstitial telomeric sequence (ITS) further away.
+- **R9**: for R9.4.1 reads basecalled with Guppy. Its patterns accept everything R10 does plus Guppy's telomere miscalls, with the same 2 kb gap limit as R10. Compare it with R9_archive on your own data before relying on it.
+- **R9_archive**: the original TeloNP settings from v1, kept unchanged so earlier results can be reproduced. It returns the last discontinuity in the read to step over gaps in noisy reads, which in long reads can count an ITS far from the telomere as part of the telomere.
+
+To reproduce results made before these presets existed, pass `chemistry="R9_archive"`.
 
 #### TeloNP recommended usage
 
 ```
-getTeloNPBoundary(seq)
+getTeloNPBoundary(seq)                           # R10 reads
+getTeloNPBoundary(seq, chemistry="R9")           # Guppy-basecalled R9.4.1 reads
+getTeloNPBoundary(seq, chemistry="R9_archive")   # reproduce TeloNP v1 results
 ```
 
 Where seq is the sequence to be analyzed.

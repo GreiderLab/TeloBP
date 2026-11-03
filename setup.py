@@ -1,8 +1,13 @@
 from setuptools import setup, find_packages
 
+# The version lives in TeloBP/_version.py so the package and its run metadata report the same one
+version = {}
+with open('TeloBP/_version.py') as f:
+    exec(f.read(), version)
+
 setup(
     name='TeloBP',
-    version='0.1',
+    version=version['__version__'],
     packages=find_packages(),
     install_requires=[
         'biopython',
@@ -11,7 +16,6 @@ setup(
         'numpy',
         'pandas',
         'pyparsing',
-        'pandarallel',
         'zipp'
     ],
     # install_requires=[
